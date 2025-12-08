@@ -1,0 +1,52 @@
+services:
+
+  app:
+    build:
+      context: .
+      target: app
+    command: "app"
+    entrypoint: "/app/server/bin/docker-entrypoint.sh"
+    working_dir: "/app/server"
+    env_file:
+      - ".env.defaults"
+      - ".env"
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    volumes:
+      - '.:/app'
+      - ./server/storage/documents:/mnt/documents:rw
+      - ./server/storage/artifacts:/mnt/artifacts:rw
+
+  db:
+    image: 'postgres:17-alpine'
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    healthcheck:
+      test: pg_isready -U app -h 127.0.0.1
+      interval: 5s
+    volumes:
+      - "pg_data:/var/lib/postgresql/data:rw"
+
+  pgweb:
+    image: sosedoff/pgweb
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      PGWEB_DATABASE_URL: "postgres://app:app@db:5432/app?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis:
+    image: 'redis:7-alpine'
+
+volumes:
+  pg_data:
