@@ -1,10 +1,14 @@
-import { marketIngestionWorker } from "./queue/workers";
+import {
+  marketIngestionWorker,
+  orderbookIngestionWorker,
+} from "./queue/workers";
 
-console.log("Starting market ingestion worker...");
+console.log("Starting ingestion workers...");
 
 const shutdown = async () => {
-  console.log("Shutting down worker...");
+  console.log("Shutting down workers...");
   await marketIngestionWorker.close();
+  await orderbookIngestionWorker.close();
   process.exit(0);
 };
 

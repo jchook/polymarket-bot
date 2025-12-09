@@ -10,7 +10,9 @@
     "db:migrate": "drizzle-kit migrate",
     "dev": "bun run src/index.ts",
     "ingest:markets": "bun run src/scripts/enqueueMarketIngest.ts",
-    "find:arbs": "bun run src/scripts/findArbs.ts"
+    "ingest:books": "bun run src/scripts/enqueueOrderbookIngest.ts",
+    "find:arbs": "bun run src/scripts/findArbs.ts",
+    "find:arbs:snapshots": "bun run src/scripts/findArbsFromSnapshots.ts"
   },
   "dependencies": {
     "@bull-board/api": "^6.9.6",

@@ -8,7 +8,12 @@ async function main() {
   const maxPages = process.env.MARKET_MAX_PAGES
     ? Number(process.env.MARKET_MAX_PAGES)
     : undefined;
-  const closed = process.env.MARKET_CLOSED === "true" ? true : undefined;
+  const closed =
+    process.env.MARKET_CLOSED === "true"
+      ? true
+      : process.env.MARKET_CLOSED === "false"
+        ? false
+        : undefined;
   const conditionIds = process.env.MARKET_CONDITION_IDS
     ? process.env.MARKET_CONDITION_IDS.split(",").map((s) => s.trim())
     : undefined;
@@ -41,11 +46,8 @@ async function main() {
 }
 
 main()
+  .then(() => process.exit(0))
   .catch((err) => {
     console.error(err);
     process.exit(1);
-  })
-  .finally(async () => {
-    // Close redis connection so the script can exit immediately.
-    await marketIngestionQueue.close();
   });

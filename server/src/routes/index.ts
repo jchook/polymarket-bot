@@ -1,8 +1,16 @@
 import type { App } from "../app";
 import { ConfigSchema, config } from "../app/config";
 import { getVersionString } from "../app/meta";
-import { marketIngestionQueue } from "../queue/queues";
-import { Health, MarketIngestionRequest } from "./schema";
+import { marketIngestionQueue, orderbookIngestionQueue } from "../queue/queues";
+import {
+  Health,
+  IntraArbQuery,
+  IntraArbResult,
+  MarketIngestionRequest,
+  OrderbookIngestionRequest,
+} from "./schema";
+import { fetchLatestSnapshots } from "../services/arbSnapshotService";
+import { findIntraArbs } from "../services/arbDetector";
 
 export function withV1(app: App) {
   app.route({
@@ -17,8 +25,27 @@ export function withV1(app: App) {
       },
     },
     handler: async (req, res) => {
-      await marketIngestionQueue.add("ingest-markets", req.body ?? {});
-      return res.status(202).send(req.body ?? {});
+      const payload = req.body ?? {};
+      await marketIngestionQueue.add("ingest-markets", payload);
+      return res.status(202).send(payload);
+    },
+  });
+
+  app.route({
+    method: "POST",
+    url: "/ingest/orderbooks",
+    schema: {
+      description: "Queue an orderbook ingestion job",
+      tags: ["Ingestion"],
+      body: OrderbookIngestionRequest,
+      response: {
+        202: OrderbookIngestionRequest,
+      },
+    },
+    handler: async (req, res) => {
+      const payload = req.body ?? {};
+      await orderbookIngestionQueue.add("ingest-orderbooks", payload);
+      return res.status(202).send(payload);
     },
   });
 
@@ -50,6 +77,30 @@ export function withV1(app: App) {
         config.version = await getVersionString();
       }
       return config;
+    },
+  });
+
+  app.route({
+    method: "GET",
+    url: "/arbs/intra",
+    schema: {
+      description: "Get intra-event (same market) arbitrage candidates from latest snapshots",
+      tags: ["Meta"],
+      querystring: IntraArbQuery,
+      response: {
+        200: z.array(IntraArbResult),
+      },
+    },
+    handler: async (req) => {
+      const conditionIds = req.query.conditionIds;
+      const exchange = req.query.exchange ?? "polymarket";
+      const threshold = req.query.threshold ?? 0;
+      const snapshots = await fetchLatestSnapshots({ conditionIds, exchange });
+      const arbs = findIntraArbs(snapshots, threshold);
+      return arbs.map((arb) => ({
+        ...arb,
+        timestamp: arb.timestamp.toISOString(),
+      }));
     },
   });
 }
