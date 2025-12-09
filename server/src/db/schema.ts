@@ -16,30 +16,28 @@ import {
 export const tradeSideEnum = pgEnum("trade_side", ["BUY", "SELL"]);
 export const tradeRoleEnum = pgEnum("trade_role", ["TAKER", "MAKER", "MIXED"]);
 
-export const markets = pgTable(
-  "markets",
-  {
-    conditionId: text("condition_id").primaryKey(),
-    eventId: text("event_id"),
-    eventSlug: text("event_slug"),
-    marketSlug: text("market_slug"),
-    title: text("title").notNull(),
-    category: text("category"),
-    underlyingSymbol: text("underlying_symbol"),
-    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
-    resolutionTime: timestamp("resolution_time", { withTimezone: true }),
-    resolved: boolean("resolved").default(false).notNull(),
-    winningOutcomeIndex: integer("winning_outcome_index"),
-    negRisk: boolean("neg_risk").default(false).notNull(),
-    tags: jsonb("tags"),
-    volume24h: numeric("volume_24h"),
-    volumeAllTime: numeric("volume_all_time"),
-    openInterest: numeric("open_interest"),
-    liquidity: numeric("liquidity"),
-    rawMetadata: jsonb("raw_metadata"),
-  },
-);
+export const markets = pgTable("markets", {
+  conditionId: text("condition_id").primaryKey(),
+  exchange: text("exchange").notNull().default("polymarket"),
+  eventId: text("event_id"),
+  eventSlug: text("event_slug"),
+  marketSlug: text("market_slug"),
+  title: text("title").notNull(),
+  category: text("category"),
+  underlyingSymbol: text("underlying_symbol"),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+  resolutionTime: timestamp("resolution_time", { withTimezone: true }),
+  resolved: boolean("resolved").default(false).notNull(),
+  winningOutcomeIndex: integer("winning_outcome_index"),
+  negRisk: boolean("neg_risk").default(false).notNull(),
+  tags: jsonb("tags"),
+  volume24h: numeric("volume_24h"),
+  volumeAllTime: numeric("volume_all_time"),
+  openInterest: numeric("open_interest"),
+  liquidity: numeric("liquidity"),
+  rawMetadata: jsonb("raw_metadata"),
+});
 
 export const marketOutcomes = pgTable(
   "market_outcomes",
@@ -68,6 +66,7 @@ export const orderbookSnapshots = pgTable(
       .references(() => markets.conditionId, { onDelete: "cascade" })
       .notNull(),
     outcomeIndex: integer("outcome_index").notNull(),
+    exchange: text("exchange").notNull().default("polymarket"),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
     bestBidPrice: numeric("best_bid_price"),
     bestBidSize: numeric("best_bid_size"),
@@ -99,6 +98,7 @@ export const priceHistory = pgTable(
       .references(() => markets.conditionId, { onDelete: "cascade" })
       .notNull(),
     outcomeIndex: integer("outcome_index").notNull(),
+    exchange: text("exchange").notNull().default("polymarket"),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
     price: numeric("price").notNull(),
     side: tradeSideEnum("side"),
@@ -125,6 +125,7 @@ export const trades = pgTable(
       .references(() => markets.conditionId, { onDelete: "cascade" })
       .notNull(),
     outcomeIndex: integer("outcome_index").notNull(),
+    exchange: text("exchange").notNull().default("polymarket"),
     taker: text("taker"),
     maker: text("maker"),
     side: tradeSideEnum("side").notNull(),
@@ -147,6 +148,7 @@ export const userTrades = pgTable(
       .references(() => trades.tradeId, { onDelete: "cascade" })
       .notNull(),
     wallet: text("wallet").notNull(),
+    exchange: text("exchange").notNull().default("polymarket"),
     role: tradeRoleEnum("role").notNull(),
     side: tradeSideEnum("side").notNull(),
     price: numeric("price").notNull(),

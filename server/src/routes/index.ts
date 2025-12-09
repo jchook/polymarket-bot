@@ -1,5 +1,5 @@
 import type { App } from "../app";
-import { config, ConfigSchema } from "../app/config";
+import { ConfigSchema, config } from "../app/config";
 import { getVersionString } from "../app/meta";
 import { marketIngestionQueue } from "../queue/queues";
 import { Health, MarketIngestionRequest } from "./schema";
@@ -35,23 +35,21 @@ export function withV1(app: App) {
     handler: async () => ({ status: "ok" as const }),
   });
 
-  ["/meta/info", "/"].forEach((route) => {
-    app.route({
-      method: "GET",
-      url: route,
-      schema: {
-        description: "Get API version and configuration",
-        tags: ["Meta"],
-        response: {
-          200: ConfigSchema,
-        },
+  app.route({
+    method: "GET",
+    url: "/meta/info",
+    schema: {
+      description: "Get API version and configuration",
+      tags: ["Meta"],
+      response: {
+        200: ConfigSchema,
       },
-      handler: async () => {
-        if (!config.version) {
-          config.version = await getVersionString();
-        }
-        return config;
-      },
-    });
+    },
+    handler: async () => {
+      if (!config.version) {
+        config.version = await getVersionString();
+      }
+      return config;
+    },
   });
 }

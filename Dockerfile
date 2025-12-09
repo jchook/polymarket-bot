@@ -3,8 +3,36 @@ FROM oven/bun:1.2-alpine AS app
 VOLUME /app
 ARG USER_ID=1000
 ARG GROUP_ID=1000
-RUN getent passwd ${USER_ID} || ( addgroup -g ${GROUP_ID} app \
-  && adduser -D -G app -u ${USER_ID} app )
+# Modify the existing bun user/group to match the desired UID/GID
+RUN deluser bun \
+  && (delgroup bun 2>/dev/null || true) \
+  && addgroup -g ${GROUP_ID} app \
+  && adduser -D -h /home/app -G app -u ${USER_ID} app
+
+# ---
+
+# Development environment
+FROM app AS app-dev
+RUN apk update \
+  && apk add --no-cache \
+    zsh git curl wget less openssh neovim fzf \
+    zsh-autosuggestions zsh-syntax-highlighting zsh-history-substring-search \
+    bash-completion coreutils starship \
+  && sed -i 's~:/bin/sh$~:/bin/zsh~' /etc/passwd \
+  && ln -s -f /bin/zsh
+RUN bun add -g @anthropic-ai/claude-code
+ENV STARSHIP_CONFIG=/etc/starship.toml \
+  HISTFILE=/home/app/.zsh/zsh_history \
+  HISTSIZE=100000 \
+  SAVEHIST=100000 \
+  TERM=xterm-256color
+USER ${USER_ID}:${GROUP_ID}
+COPY --chown=${USER_ID}:${GROUP_ID} ./server/etc/home/ /home/app/
+COPY ./server/etc/starship.toml /etc/starship.toml
+WORKDIR /app
+VOLUME /home/app/.claude
+CMD ["/bin/zsh"]
+
 
 # ---
 

@@ -1,11 +1,11 @@
 import "zod-openapi/extend";
 import Fastify from "fastify";
 import {
+  type FastifyZodOpenApiTypeProvider,
   fastifyZodOpenApiPlugin,
   fastifyZodOpenApiTransform,
   fastifyZodOpenApiTransformObject,
   serializerCompiler,
-  type FastifyZodOpenApiTypeProvider,
   validatorCompiler,
 } from "fastify-zod-openapi";
 import { bullBoard } from "../queue/board";
@@ -21,8 +21,8 @@ fastify.setSerializerCompiler(serializerCompiler);
 
 export const app = fastify.withTypeProvider<FastifyZodOpenApiTypeProvider>();
 
-// Register Bull Board UI
-app.register(bullBoard);
+// Register Bull Board UI at /v1/admin/queues
+app.register(bullBoard, { prefix: "/v1/admin/queues" });
 
 await fastify.register(fastifyZodOpenApiPlugin);
 await fastify.register(import("@fastify/swagger"), {

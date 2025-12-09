@@ -3,7 +3,7 @@ services:
   app:
     build:
       context: .
-      target: app
+      target: app-dev
     command: "app"
     entrypoint: "/app/server/bin/docker-entrypoint.sh"
     working_dir: "/app/server"

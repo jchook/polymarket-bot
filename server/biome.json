@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**/*", "tests/**/*"]
+    "include": ["src/**/*", "tests/**/*"]
   },
   "formatter": {
     "enabled": true,
@@ -26,12 +26,5 @@
       "quoteStyle": "double"
     }
   },
-  "assist": {
-    "enabled": true,
-    "actions": {
-      "source": {
-        "organizeImports": "on"
-      }
-    }
-  }
+  "assists": {}
 }

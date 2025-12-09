@@ -1,0 +1,22 @@
+lsd
+apk add lsd
+d
+g
+ls --color
+apk add rlwrap
+bun repl
+NODE_NO_READLINE=1 rlwrap -ppurple bun repl
+rlwrap -ppurple bun repl
+node
+ip address
+ip
+ip a
+ip --help
+man ip
+git status
+apk search nerdfont
+bun drizzle
+bun drizzle-kit
+bun drizzle-kit push
+ls
+ls -lh

@@ -10,6 +10,4 @@ createBullBoard({
   serverAdapter,
 });
 
-serverAdapter.setBasePath("/v1/admin/queues");
-
 export const bullBoard = serverAdapter.registerPlugin();

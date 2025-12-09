@@ -6,7 +6,7 @@ function toEnvKey(key: string, prefix: string): string {
 
 export function loadConfigFromEnv<T extends ZodRawShape>(
   schema: ZodObject<T>,
-  prefix: string = "",
+  prefix = "",
 ): z.infer<typeof schema> {
   const raw: Record<string, unknown> = {};
 
