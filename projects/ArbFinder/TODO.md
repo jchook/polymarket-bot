@@ -8,8 +8,9 @@
 ## Milestones / Steps
 - [ ] **Market/Event ingestion (Arb scope)**: ensure open markets ingested; include event linkage, tags, fee/tick if available; CLI/queue params for `closed=false`/scope.
 - [ ] **Book snapshot ingestor**: configurable cadence + jitter/backoff; scope by conditionIds/tags; persist to `orderbook_snapshots`; track lag/errors.
-- [ ] **Intra-event arb detector (DB-backed)**: use latest snapshots; margin/liquidity thresholds; ranking/output format; CLI/worker.
-- [ ] **Cross-venue matcher (baseline)**: heuristic string/slug/tag matching between venues; fee assumptions configurable; outputs candidate pairs.
+- [x] **Intra-event arb detector (DB-backed)**: use latest snapshots; margin/liquidity thresholds; ranking/output format; CLI/worker. `fetchLatestSnapshots` in `server/src/services/arbSnapshotService.ts` pulls the latest per outcome; `findArbsFromSnapshots` uses it.
+- [ ] **Cross-venue matcher (baseline)**: heuristic string/slug/tag matching between venues; fee assumptions configurable; outputs candidate pairs. Heuristic matcher scaffolded (`marketMatcher`, `ARB_MATCHER`), but venue-specific pairing still needed.
+- [x] **Arb persistence**: store detected arbs + legs in DB for later review/analytics. Tables added (`arb_opportunities`, `arb_opportunity_legs`) and `saveArbOpportunities` used in `findArbsFromSnapshots` (guarded by `STORE_ARBS`).
 - [ ] **Embeddings + pgvector**: generate/store embeddings over market/event text; NN search for candidate pairs.
 - [ ] **LLM re-rank/verify**: validate cross-venue semantic match and outcome direction; annotate confidence.
 - [ ] **Alerting/output**: CLI/JSON feed; optional webhook; include timestamp, legs, prices, margin, liquidity.
@@ -31,5 +32,6 @@
 ## Next immediate tasks (implementation kickoff)
 - [x] Define BookIngestor worker interface: cadence envs, scope filters, jitter/backoff, and output schema for progress logs.
 - [x] Add CLI command to enqueue book ingestion for a scope (conditionIds/tags/all).
-- [ ] Add DB query for “latest snapshot per outcome” to feed the intra-event arb detector.
+- [x] Add DB query for “latest snapshot per outcome” to feed the intra-event arb detector. Implemented as `fetchLatestSnapshots` in `server/src/services/arbSnapshotService.ts`; consumed by `findArbsFromSnapshots`.
 - [ ] Sketch output JSON shape for arb detector (intra-event) and wiring to a CLI script.
+- [ ] Generate Drizzle migration for `arb_opportunities` + `arb_opportunity_legs` tables.

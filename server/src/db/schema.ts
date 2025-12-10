@@ -243,3 +243,39 @@ export const userPnlSnapshots = pgTable(
     index("idx_user_pnl_condition").on(table.conditionId),
   ],
 );
+
+export const arbOpportunities = pgTable("arb_opportunities", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  matcherName: text("matcher_name").notNull(),
+  matcherKey: text("matcher_key").notNull(),
+  kind: text("kind").notNull(),
+  margin: numeric("margin").notNull(),
+  totalAsk: numeric("total_ask").notNull(),
+  legCount: integer("leg_count").notNull(),
+  thresholdUsed: numeric("threshold_used"),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const arbOpportunityLegs = pgTable("arb_opportunity_legs", {
+  id: serial("id").primaryKey(),
+  opportunityId: uuid("opportunity_id")
+    .references(() => arbOpportunities.id, { onDelete: "cascade" })
+    .notNull(),
+  conditionId: text("condition_id").notNull(),
+  outcomeIndex: integer("outcome_index").notNull(),
+  exchange: text("exchange").notNull().default("polymarket"),
+  title: text("title"),
+  marketSlug: text("market_slug"),
+  outcomeName: text("outcome_name").notNull(),
+  bestAskPrice: numeric("best_ask_price"),
+  bestAskSize: numeric("best_ask_size"),
+  bestBidPrice: numeric("best_bid_price"),
+  bestBidSize: numeric("best_bid_size"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});

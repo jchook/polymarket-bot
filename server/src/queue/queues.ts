@@ -16,13 +16,16 @@ function attachQueueLogging<T>(queue: Queue<T>, name: string) {
     console.log(`[queue:${name}] job active id=${job.id}`);
   });
   queue.on("failed", (job, err) => {
-    console.error(`[queue:${name}] job failed id=${job?.id} err=${err.message}`);
+    console.error(
+      `[queue:${name}] job failed id=${job?.id} err=${err.message}`,
+    );
   });
   return queue;
 }
 
 export interface MarketIngestionJob {
   tag?: string;
+  slugs?: string[];
   pageSize?: number;
   maxPages?: number;
   closed?: boolean; // when undefined, Gamma returns all; set to false for open-only or true for resolved

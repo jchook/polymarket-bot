@@ -5,10 +5,11 @@
 - Structure:
   - `src/db/` – Drizzle schema/relations/db client (snake_case tables/cols). Migrations live in `drizzle/`.
   - `src/queue/` – BullMQ queues/workers (market ingestion), Bull Board adapter.
-  - `src/routes/` – Fastify endpoints (ingestion enqueue, health, meta); Bull Board mounted at `/v1/admin/queues`.
-  - `src/app/` – Fastify app/config/bootstrap.
-  - `src/worker.ts` – Worker entrypoint (ingestion).
-  - `src/scripts/enqueueMarketIngest.ts` – Enqueue a market-ingestion job via env vars.
+- `src/routes/` – Fastify endpoints (ingestion enqueue, health, meta); Bull Board mounted at `/v1/admin/queues`.
+- `src/app/` – Fastify app/config/bootstrap.
+- `src/worker.ts` – Worker entrypoint (ingestion).
+- `src/scripts/enqueueMarketIngest.ts` – Enqueue a market-ingestion job via env vars.
+- `src/scripts/ingestCryptoMarkets.ts` – Targeted BTC/ETH 15m/1h market enqueue via slug derivation.
 
 ## Commands (justfile)
 
@@ -22,10 +23,14 @@
 ## Ingestion (markets)
 
 - SDK: `polymarket-data` `listGammaMarkets` used in `src/queue/workers.ts`.
-- Job params (BullMQ): `tag?`, `pageSize?`, `maxPages?`, `closed?`, `conditionIds?`, `exchange?` (defaults to `polymarket`).
+- Job params (BullMQ): `tag?`, `slugs?`, `pageSize?`, `maxPages?`, `closed?`, `conditionIds?`, `exchange?` (defaults to `polymarket`).
 - Enqueue via script envs (set before `bun run ingest:markets`):
   - `MARKET_TAG`, `MARKET_PAGE_SIZE`, `MARKET_MAX_PAGES`, `MARKET_CLOSED=true`, `MARKET_CONDITION_IDS=...` (comma-separated), `MARKET_EXCHANGE=...`.
 - Idempotency: DB uniques + upserts; reruns are safe.
+
+## Targeted crypto ingestion
+
+- Script `bun run src/scripts/ingestCryptoMarkets.ts` computes current/next BTC/ETH 15m/1h slugs and enqueues a market ingest using those slugs. Optional env: `CRYPTO_EXCHANGE` label passed through to ingestion.
 
 ## Dashboard
 

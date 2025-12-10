@@ -1,6 +1,8 @@
 import {
   type ListMarketsParams,
   type Market,
+  type Event,
+  type EventParams,
   Polymarket,
 } from "polymarket-data";
 
@@ -14,4 +16,11 @@ export async function listGammaMarkets(
   return client.gamma.markets.listMarkets(params);
 }
 
-export type { ListMarketsParams, Market };
+export async function getGammaEventBySlug(
+  slug: string,
+  params?: EventParams,
+): Promise<Event> {
+  return client.gamma.events.getEventBySlug(slug, params);
+}
+
+export type { ListMarketsParams, Market, Event, EventParams };

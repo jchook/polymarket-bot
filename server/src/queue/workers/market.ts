@@ -3,7 +3,9 @@ import {
   type ListMarketsParams,
   type Market,
   listGammaMarkets,
+  getGammaEventBySlug,
 } from "../../clients/polymarketData";
+import { clobClient } from "../../clients/polymarketClob";
 import { db } from "../../db";
 import { marketOutcomes, markets } from "../../db/schema";
 import type { MarketIngestionJob } from "../queues";
@@ -31,15 +33,12 @@ async function upsertMarket(
     (market as Record<string, string | null | undefined>).clobTokenIds,
   );
 
-  const primaryEvent =
-    (market as Record<string, { id?: string; slug?: string }[] | undefined>)
-      .events?.[0];
+  const primaryEvent = (
+    market as Record<string, { id?: string; slug?: string }[] | undefined>
+  ).events?.[0];
 
   const tagsRaw = (market as Record<string, unknown>).tags;
-  const tags =
-    Array.isArray(tagsRaw) && tagsRaw.length
-      ? tagsRaw
-      : undefined;
+  const tags = Array.isArray(tagsRaw) && tagsRaw.length ? tagsRaw : undefined;
 
   const resolved = Boolean(market.closed ?? false);
 
@@ -150,6 +149,93 @@ async function upsertMarket(
 }
 
 async function handleIngestionJob(job: Job<MarketIngestionJob>): Promise<void> {
+  if (job.data.slugs && job.data.slugs.length) {
+    await job.log(
+      `Slugs provided; fetching via Gamma events: count=${job.data.slugs.length}`,
+    );
+    let processed = 0;
+    let resolvedCount = 0;
+
+    for (const slug of job.data.slugs) {
+      try {
+        const event = await getGammaEventBySlug(slug);
+        const marketsArr = (event as Record<string, unknown>).markets;
+        if (!Array.isArray(marketsArr) || !marketsArr.length) {
+          await job.log(`No markets found for slug=${slug}`);
+          continue;
+        }
+        await job.log(
+          `Fetched ${marketsArr.length} markets for slug=${slug}`,
+        );
+        for (const market of marketsArr) {
+          const { resolved } = await upsertMarket(
+            market as Market,
+            job.data.exchange ?? "polymarket",
+          );
+          processed += 1;
+          if (resolved) resolvedCount += 1;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await job.log(`Failed to fetch/upsert markets for slug=${slug}: ${msg}`);
+      }
+    }
+
+    await job.updateProgress({
+      completed: true,
+      processed,
+      resolved: resolvedCount,
+      via: "gamma-slug",
+    });
+    await job.log(
+      `Slug-based ingestion complete. processed=${processed}, resolved=${resolvedCount}`,
+    );
+    return;
+  }
+
+  if (job.data.conditionIds && job.data.conditionIds.length) {
+    await job.log(
+      `ConditionIds provided; fetching individually via CLOB: count=${job.data.conditionIds.length}`,
+    );
+    let processed = 0;
+    let resolvedCount = 0;
+    for (const conditionId of job.data.conditionIds) {
+      try {
+        const market = await clobClient.getMarket(conditionId);
+        const mappedSlug = job.data.slugByCondition?.[conditionId];
+        if (mappedSlug) {
+          const m = market as Record<string, unknown>;
+          // Backfill slugs when CLOB response lacks them
+          if (!m.slug) m.slug = mappedSlug;
+          if (!m.eventSlug) m.eventSlug = mappedSlug;
+          if (!m.event_slug) m.event_slug = mappedSlug;
+          if (!m.marketSlug) m.marketSlug = mappedSlug;
+        }
+        const { resolved } = await upsertMarket(
+          market as Market,
+          job.data.exchange ?? "polymarket",
+        );
+        processed += 1;
+        if (resolved) resolvedCount += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await job.log(
+          `Failed to fetch/upsert market conditionId=${conditionId}: ${msg}`,
+        );
+      }
+    }
+    await job.updateProgress({
+      completed: true,
+      processed,
+      resolved: resolvedCount,
+      via: "clob",
+    });
+    await job.log(
+      `ConditionId ingestion complete via CLOB. processed=${processed}, resolved=${resolvedCount}`,
+    );
+    return;
+  }
+
   const pageSize = job.data.pageSize ?? 100;
   const maxPages = job.data.maxPages ?? 100;
   const baseParams: ListMarketsParams = {
@@ -158,6 +244,16 @@ async function handleIngestionJob(job: Job<MarketIngestionJob>): Promise<void> {
     closed: job.data.closed,
     condition_ids: job.data.conditionIds,
   };
+
+  await job.log(
+    `Starting market ingestion with params=${JSON.stringify({
+      condition_ids: baseParams.condition_ids,
+      tag: job.data.tag,
+      closed: baseParams.closed,
+      pageSize,
+      maxPages,
+    })}`,
+  );
 
   let totalProcessed = 0;
   let pagesFetched = 0;
@@ -169,7 +265,13 @@ async function handleIngestionJob(job: Job<MarketIngestionJob>): Promise<void> {
       `Fetching markets page=${page + 1}, offset=${params.offset}, pageSize=${pageSize}, closed=${params.closed ?? "any"}`,
     );
     const marketsList = await listGammaMarkets(params);
-    if (!marketsList.length) break;
+    await job.log(
+      `Fetched ${marketsList.length} markets on page ${page + 1} (condition_ids=${params.condition_ids?.join(",") ?? "all"})`,
+    );
+    if (!marketsList.length) {
+      await job.log("No markets returned; stopping pagination");
+      break;
+    }
     pagesFetched += 1;
     for (const market of marketsList) {
       const { resolved } = await upsertMarket(

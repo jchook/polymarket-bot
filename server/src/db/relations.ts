@@ -6,6 +6,8 @@ import {
   markets,
   orderbookSnapshots,
   priceHistory,
+  arbOpportunities,
+  arbOpportunityLegs,
   trades,
   userTrades,
 } from "./schema";
@@ -66,3 +68,20 @@ export const backtestOrderRelations = relations(backtestOrders, ({ one }) => ({
     references: [backtestRuns.id],
   }),
 }));
+
+export const arbOpportunityRelations = relations(
+  arbOpportunities,
+  ({ many }) => ({
+    legs: many(arbOpportunityLegs),
+  }),
+);
+
+export const arbOpportunityLegRelations = relations(
+  arbOpportunityLegs,
+  ({ one }) => ({
+    opportunity: one(arbOpportunities, {
+      fields: [arbOpportunityLegs.opportunityId],
+      references: [arbOpportunities.id],
+    }),
+  }),
+);

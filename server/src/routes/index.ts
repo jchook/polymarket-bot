@@ -1,3 +1,4 @@
+import z from "zod";
 import type { App } from "../app";
 import { ConfigSchema, config } from "../app/config";
 import { getVersionString } from "../app/meta";
@@ -11,6 +12,7 @@ import {
 } from "./schema";
 import { fetchLatestSnapshots } from "../services/arbSnapshotService";
 import { findIntraArbs } from "../services/arbDetector";
+import { getMatcher } from "../services/marketMatcher";
 
 export function withV1(app: App) {
   app.route({
@@ -84,7 +86,8 @@ export function withV1(app: App) {
     method: "GET",
     url: "/arbs/intra",
     schema: {
-      description: "Get intra-event (same market) arbitrage candidates from latest snapshots",
+      description:
+        "Get intra-event (same market) arbitrage candidates from latest snapshots",
       tags: ["Meta"],
       querystring: IntraArbQuery,
       response: {
@@ -95,8 +98,9 @@ export function withV1(app: App) {
       const conditionIds = req.query.conditionIds;
       const exchange = req.query.exchange ?? "polymarket";
       const threshold = req.query.threshold ?? 0;
+      const matcher = getMatcher(req.query.matcher);
       const snapshots = await fetchLatestSnapshots({ conditionIds, exchange });
-      const arbs = findIntraArbs(snapshots, threshold);
+      const arbs = findIntraArbs(snapshots, threshold, matcher);
       return arbs.map((arb) => ({
         ...arb,
         timestamp: arb.timestamp.toISOString(),

@@ -37,11 +37,11 @@ async function main() {
         maxPages,
         closed,
         conditionIds,
-      exchange,
-    },
-    null,
-    2,
-  ),
+        exchange,
+      },
+      null,
+      2,
+    ),
   );
 }
 

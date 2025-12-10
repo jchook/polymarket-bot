@@ -29,7 +29,11 @@ type ArbOpportunity = {
   title: string;
   marketSlug: string | null;
   outcomes: Array<
-    OrderbookBest & { tokenId: string; outcomeName: string; outcomeIndex: number }
+    OrderbookBest & {
+      tokenId: string;
+      outcomeName: string;
+      outcomeIndex: number;
+    }
   >;
   totalAsk: number;
   margin: number;
@@ -66,10 +70,14 @@ async function fetchActiveBinaryOutcomes(): Promise<Outcome[][]> {
     grouped.set(row.conditionId, list);
   }
 
-  return Array.from(grouped.values()).filter((outcomes) => outcomes.length === 2);
+  return Array.from(grouped.values()).filter(
+    (outcomes) => outcomes.length === 2,
+  );
 }
 
-function getBestPrices(book: Awaited<ReturnType<typeof clobClient.getOrderBook>>): OrderbookBest {
+function getBestPrices(
+  book: Awaited<ReturnType<typeof clobClient.getOrderBook>>,
+): OrderbookBest {
   const bestBid = book.bids?.[0];
   const bestAsk = book.asks?.[0];
   return {
@@ -90,22 +98,22 @@ async function fetchOrderbooksWithConcurrency(
   );
   let index = 0;
 
-  const workers = Array.from({ length: Math.min(concurrency, flatOutcomes.length) }).map(
-    async () => {
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const currentIndex = index++;
-        if (currentIndex >= flatOutcomes.length) break;
-        const outcome = flatOutcomes[currentIndex];
-        const book = await clobClient.getOrderBook(outcome.tokenId);
-        results[currentIndex] = {
-          ...outcome,
-          book,
-          best: getBestPrices(book),
-        };
-      }
-    },
-  );
+  const workers = Array.from({
+    length: Math.min(concurrency, flatOutcomes.length),
+  }).map(async () => {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const currentIndex = index++;
+      if (currentIndex >= flatOutcomes.length) break;
+      const outcome = flatOutcomes[currentIndex];
+      const book = await clobClient.getOrderBook(outcome.tokenId);
+      results[currentIndex] = {
+        ...outcome,
+        book,
+        best: getBestPrices(book),
+      };
+    }
+  });
 
   await Promise.all(workers);
 
@@ -117,8 +125,8 @@ async function fetchOrderbooksWithConcurrency(
     byCondition.set(item.conditionId, list);
   }
 
-  return outcomes.map((pair) =>
-    byCondition.get(pair[0]?.conditionId ?? "") ?? [],
+  return outcomes.map(
+    (pair) => byCondition.get(pair[0]?.conditionId ?? "") ?? [],
   );
 }
 
@@ -135,9 +143,7 @@ async function saveSnapshots(rows: BookWithOutcome[], timestamp: Date) {
     bestAskSize: toNumericString(row.best.bestAskSize),
     midPrice:
       row.best.bestBidPrice !== null && row.best.bestAskPrice !== null
-        ? toNumericString(
-            (row.best.bestBidPrice + row.best.bestAskPrice) / 2,
-          )
+        ? toNumericString((row.best.bestBidPrice + row.best.bestAskPrice) / 2)
         : null,
     spread:
       row.best.bestBidPrice !== null && row.best.bestAskPrice !== null
@@ -146,10 +152,7 @@ async function saveSnapshots(rows: BookWithOutcome[], timestamp: Date) {
     rawOrderbook: row.book,
   }));
 
-  await db
-    .insert(orderbookSnapshots)
-    .values(inserts)
-    .onConflictDoNothing();
+  await db.insert(orderbookSnapshots).values(inserts).onConflictDoNothing();
 }
 
 function findArbs(pairs: BookWithOutcome[][]): ArbOpportunity[] {

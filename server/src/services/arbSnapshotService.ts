@@ -6,6 +6,8 @@ export type LatestSnapshot = {
   conditionId: string;
   title: string;
   marketSlug: string | null;
+  eventSlug: string | null;
+  exchange: string;
   outcomeIndex: number;
   outcomeName: string;
   tokenId: string;
@@ -35,23 +37,21 @@ export async function fetchLatestSnapshots({
       : and(...baseWhere);
 
   // get the latest timestamp per (conditionId, outcomeIndex)
-  const latestPerOutcome = db
-    .$with("latest_per_outcome")
-    .as(
-      db
-        .select({
-          conditionId: orderbookSnapshots.conditionId,
-          outcomeIndex: orderbookSnapshots.outcomeIndex,
-          maxTs: sql`max(${orderbookSnapshots.timestamp})`.as("max_ts"),
-        })
-        .from(orderbookSnapshots)
-        .innerJoin(
-          markets,
-          eq(orderbookSnapshots.conditionId, markets.conditionId),
-        )
-        .where(where)
-        .groupBy(orderbookSnapshots.conditionId, orderbookSnapshots.outcomeIndex),
-    );
+  const latestPerOutcome = db.$with("latest_per_outcome").as(
+    db
+      .select({
+        conditionId: orderbookSnapshots.conditionId,
+        outcomeIndex: orderbookSnapshots.outcomeIndex,
+        maxTs: sql`max(${orderbookSnapshots.timestamp})`.as("max_ts"),
+      })
+      .from(orderbookSnapshots)
+      .innerJoin(
+        markets,
+        eq(orderbookSnapshots.conditionId, markets.conditionId),
+      )
+      .where(where)
+      .groupBy(orderbookSnapshots.conditionId, orderbookSnapshots.outcomeIndex),
+  );
 
   const rows = await db
     .with(latestPerOutcome)
@@ -59,9 +59,11 @@ export async function fetchLatestSnapshots({
       conditionId: markets.conditionId,
       title: markets.title,
       marketSlug: markets.marketSlug,
+      eventSlug: markets.eventSlug,
       outcomeIndex: orderbookSnapshots.outcomeIndex,
       outcomeName: marketOutcomes.outcomeName,
       tokenId: marketOutcomes.tokenId,
+      exchange: orderbookSnapshots.exchange,
       bestBidPrice: orderbookSnapshots.bestBidPrice,
       bestBidSize: orderbookSnapshots.bestBidSize,
       bestAskPrice: orderbookSnapshots.bestAskPrice,
@@ -84,10 +86,7 @@ export async function fetchLatestSnapshots({
         eq(orderbookSnapshots.outcomeIndex, marketOutcomes.outcomeIndex),
       ),
     )
-    .innerJoin(
-      markets,
-      eq(orderbookSnapshots.conditionId, markets.conditionId),
-    )
+    .innerJoin(markets, eq(orderbookSnapshots.conditionId, markets.conditionId))
     .where(where)
     .orderBy(
       desc(orderbookSnapshots.timestamp),
@@ -97,6 +96,7 @@ export async function fetchLatestSnapshots({
 
   return rows.map((r) => ({
     ...r,
+    exchange: r.exchange,
     bestBidPrice: r.bestBidPrice ? Number(r.bestBidPrice) : null,
     bestBidSize: r.bestBidSize ? Number(r.bestBidSize) : null,
     bestAskPrice: r.bestAskPrice ? Number(r.bestAskPrice) : null,

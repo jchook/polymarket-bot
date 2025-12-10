@@ -3,12 +3,19 @@ import { z } from "zod";
 export const MarketIngestionRequest = z
   .object({
     tag: z.string().optional(),
-    closed: z.boolean().optional().describe("Fetch closed markets (default: false)"),
+    slugs: z.array(z.string().min(1)).optional(),
+    closed: z
+      .boolean()
+      .optional()
+      .describe("Fetch closed markets (default: false)"),
     conditionIds: z
       .array(z.string().min(1))
       .optional()
       .describe("Restrict ingestion to specific condition IDs"),
-    exchange: z.string().optional().describe("Exchange name label (default: polymarket)"),
+    exchange: z
+      .string()
+      .optional()
+      .describe("Exchange name label (default: polymarket)"),
     pageSize: z
       .number()
       .int()
@@ -32,7 +39,10 @@ export const MarketIngestionRequest = z
 export const OrderbookIngestionRequest = z
   .object({
     conditionIds: z.array(z.string().min(1)).optional(),
-    exchange: z.string().optional().describe("Exchange label (default polymarket)"),
+    exchange: z
+      .string()
+      .optional()
+      .describe("Exchange label (default polymarket)"),
     concurrency: z.number().int().min(1).max(20).optional(),
   })
   .openapi({
@@ -44,7 +54,14 @@ export const IntraArbQuery = z
   .object({
     conditionIds: z.array(z.string()).optional(),
     exchange: z.string().optional(),
-    threshold: z.number().optional().describe("Minimum margin (e.g. 0.0 for any arb)"),
+    threshold: z
+      .number()
+      .optional()
+      .describe("Minimum margin (e.g. 0.0 for any arb)"),
+    matcher: z
+      .string()
+      .optional()
+      .describe("Market matcher name (heuristic, heuristic-v1, etc.)"),
   })
   .openapi({
     ref: "IntraArbQuery",
@@ -52,8 +69,10 @@ export const IntraArbQuery = z
   });
 
 export const IntraArbOutcome = z.object({
+  conditionId: z.string(),
   outcomeIndex: z.number(),
   outcomeName: z.string(),
+  exchange: z.string(),
   bestAskPrice: z.number().nullable(),
   bestAskSize: z.number().nullable(),
   bestBidPrice: z.number().nullable(),
@@ -61,6 +80,9 @@ export const IntraArbOutcome = z.object({
 });
 
 export const IntraArbResult = z.object({
+  matcherName: z.string(),
+  matcherKey: z.string(),
+  conditionIds: z.array(z.string()),
   conditionId: z.string(),
   title: z.string(),
   marketSlug: z.string().nullable(),

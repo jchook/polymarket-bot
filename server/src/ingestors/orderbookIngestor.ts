@@ -26,7 +26,10 @@ async function loadOutcomes(
   conditionIds?: string[],
 ): Promise<Record<string, OutcomeRow[]>> {
   const where = conditionIds?.length
-    ? and(inArray(markets.conditionId, conditionIds), eq(markets.resolved, false))
+    ? and(
+        inArray(markets.conditionId, conditionIds),
+        eq(markets.resolved, false),
+      )
     : eq(markets.resolved, false);
 
   const rows = await db
@@ -77,30 +80,30 @@ async function fetchOrderbooks(
   > = new Array(outcomes.length);
 
   let idx = 0;
-  const workers = Array.from({ length: Math.min(concurrency, outcomes.length) }).map(
-    async () => {
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const current = idx++;
-        if (current >= outcomes.length) break;
-        const outcome = outcomes[current];
-        const book = await clobClient.getOrderBook(outcome.tokenId);
-        const bestBid = book.bids?.[0];
-        const bestAsk = book.asks?.[0];
-        results[current] = {
-          outcome,
-          bestBidPrice: toNumber(bestBid?.price),
-          bestBidSize: toNumber(bestBid?.size),
-          bestAskPrice: toNumber(bestAsk?.price),
-          bestAskSize: toNumber(bestAsk?.size),
-          raw: book,
-        };
-      }
-    },
-  );
+  const workers = Array.from({
+    length: Math.min(concurrency, outcomes.length),
+  }).map(async () => {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const current = idx++;
+      if (current >= outcomes.length) break;
+      const outcome = outcomes[current];
+      const book = await clobClient.getOrderBook(outcome.tokenId);
+      const bestBid = book.bids?.[0];
+      const bestAsk = book.asks?.[0];
+      results[current] = {
+        outcome,
+        bestBidPrice: toNumber(bestBid?.price),
+        bestBidSize: toNumber(bestBid?.size),
+        bestAskPrice: toNumber(bestAsk?.price),
+        bestAskSize: toNumber(bestAsk?.size),
+        raw: book,
+      };
+    }
+  });
 
   await Promise.all(workers);
-  return results.filter(Boolean) as NonNullable<typeof results[number]>[];
+  return results.filter(Boolean) as NonNullable<(typeof results)[number]>[];
 }
 
 export async function ingestOrderbooks({
