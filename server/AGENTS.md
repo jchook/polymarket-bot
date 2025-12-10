@@ -41,6 +41,7 @@
   - `PRICE_EXCHANGE` (label, default `binance`)
   - `PRICE_START_ISO` / `PRICE_END_ISO` (optional ISO timestamps; default start = latest+interval or last 12h, end=now)
   - `PRICE_INTERVAL_MS` (default `900000` = 15m; allowed: 1m,3m,5m,15m,30m)
+  - `PRICE_PROVIDER` (`bitstamp` default; `binance` also supported)
 
 ## Dashboard
 

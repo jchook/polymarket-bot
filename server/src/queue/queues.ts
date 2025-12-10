@@ -56,6 +56,7 @@ export interface BtcPriceIngestionJob {
   start?: string; // ISO timestamp
   end?: string; // ISO timestamp
   intervalMs?: number; // e.g., 60000
+  provider?: "binance" | "bitstamp";
 }
 
 export const orderbookIngestionQueue = new Queue<OrderbookIngestionJob>(

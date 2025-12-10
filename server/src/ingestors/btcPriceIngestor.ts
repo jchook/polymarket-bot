@@ -8,6 +8,7 @@ type FetchKlinesParams = {
   start: number; // ms
   end: number; // ms
   limit?: number;
+  provider: "binance" | "bitstamp";
 };
 
 type Kline = {
@@ -57,6 +58,47 @@ async function fetchBinanceKlines({
   });
 }
 
+async function fetchBitstampOhlc({
+  symbol,
+  interval,
+  start,
+  end,
+}: FetchKlinesParams): Promise<Kline[]> {
+  const stepSeconds = Number(interval.replace("m", "")) * 60;
+  const url = new URL(
+    `https://www.bitstamp.net/api/v2/ohlc/${symbol.toLowerCase()}/`,
+  );
+  url.searchParams.set("step", stepSeconds.toString());
+  url.searchParams.set("limit", "1000");
+  url.searchParams.set("start", Math.floor(start / 1000).toString());
+  url.searchParams.set("end", Math.floor(end / 1000).toString());
+
+  const resp = await fetch(url.toString());
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(
+      `Bitstamp ohlc error status=${resp.status} body=${text ?? ""}`,
+    );
+  }
+  const data = (await resp.json()) as {
+    data?: { ohlc?: Array<Record<string, string>> };
+  };
+  const rows = data?.data?.ohlc ?? [];
+  return rows.map((r) => ({
+    openTime: Number(r.timestamp) * 1000,
+    open: r.open,
+    high: r.high,
+    low: r.low,
+    close: r.close,
+    volume: r.volume,
+  }));
+}
+
+async function fetchKlines(params: FetchKlinesParams): Promise<Kline[]> {
+  if (params.provider === "bitstamp") return fetchBitstampOhlc(params);
+  return fetchBinanceKlines(params);
+}
+
 function toNumericString(value: string | number): string {
   if (typeof value === "number") return value.toString();
   return value;
@@ -68,6 +110,7 @@ export type BtcPriceIngestConfig = {
   start?: Date;
   end?: Date;
   intervalMs?: number;
+  provider?: "binance" | "bitstamp";
 };
 
 function normalizeIntervalMs(intervalMs?: number): { intervalMs: number; binance: string } {
@@ -93,6 +136,7 @@ export async function ingestBtcPrices({
   start,
   end = new Date(),
   intervalMs,
+  provider = "bitstamp",
 }: BtcPriceIngestConfig = {}) {
   const interval = normalizeIntervalMs(intervalMs);
   // Determine start from DB if not provided
@@ -126,12 +170,13 @@ export async function ingestBtcPrices({
   const limit = 1000;
   while (cursor < endMs) {
     const batchEnd = Math.min(endMs, cursor + interval.intervalMs * limit);
-    const klines = await fetchBinanceKlines({
+    const klines = await fetchKlines({
       symbol,
       interval: interval.binance,
       start: cursor,
       end: batchEnd,
       limit,
+      provider,
     });
     batches += 1;
 

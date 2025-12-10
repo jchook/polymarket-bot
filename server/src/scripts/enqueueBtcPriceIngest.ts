@@ -11,6 +11,8 @@ async function main() {
   const intervalMs = process.env.PRICE_INTERVAL_MS
     ? Number(process.env.PRICE_INTERVAL_MS)
     : 15 * 60 * 1000;
+  const provider =
+    process.env.PRICE_PROVIDER === "binance" ? "binance" : "bitstamp";
 
   await btcPriceIngestionQueue.add("ingest-btc-prices", {
     symbol,
@@ -18,11 +20,16 @@ async function main() {
     start,
     end,
     intervalMs,
+    provider,
   });
 
   console.log(
     "Enqueued BTC price ingestion job",
-    JSON.stringify({ symbol, exchange, start, end, intervalMs }, null, 2),
+    JSON.stringify(
+      { symbol, exchange, start, end, intervalMs, provider },
+      null,
+      2,
+    ),
   );
 }
 

@@ -7,11 +7,12 @@ async function handleBtcPriceJob(job: Job<BtcPriceIngestionJob>): Promise<void> 
   const symbol = job.data.symbol ?? "BTCUSDT";
   const exchange = job.data.exchange ?? "binance";
   const intervalMs = job.data.intervalMs;
+  const provider = job.data.provider ?? "bitstamp";
   const start = job.data.start ? new Date(job.data.start) : undefined;
   const end = job.data.end ? new Date(job.data.end) : undefined;
 
   await job.log(
-    `BTC price ingestion start symbol=${symbol} exchange=${exchange} intervalMs=${intervalMs} start=${start?.toISOString() ?? "auto"} end=${end?.toISOString() ?? "now"}`,
+    `BTC price ingestion start symbol=${symbol} exchange=${exchange} provider=${provider} intervalMs=${intervalMs ?? "default"} start=${start?.toISOString() ?? "auto"} end=${end?.toISOString() ?? "now"}`,
   );
 
   const { inserted, batches } = await ingestBtcPrices({
@@ -20,6 +21,7 @@ async function handleBtcPriceJob(job: Job<BtcPriceIngestionJob>): Promise<void> 
     start,
     end,
     intervalMs,
+    provider,
   });
 
   await job.updateProgress({ completed: true, inserted, batches });
