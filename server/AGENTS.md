@@ -4,12 +4,13 @@
 - Priorities: correctness, idempotency (unique constraints + upserts), camelCase in code → snake_case in DB, low-latency ingestion, reproducible backtests, multi-exchange readiness (schema has `exchange` columns).
 - Structure:
   - `src/db/` – Drizzle schema/relations/db client (snake_case tables/cols). Migrations live in `drizzle/`.
-  - `src/queue/` – BullMQ queues/workers (market ingestion), Bull Board adapter.
+- `src/queue/` – BullMQ queues/workers (market ingestion), Bull Board adapter.
 - `src/routes/` – Fastify endpoints (ingestion enqueue, health, meta); Bull Board mounted at `/v1/admin/queues`.
 - `src/app/` – Fastify app/config/bootstrap.
 - `src/worker.ts` – Worker entrypoint (ingestion).
 - `src/scripts/enqueueMarketIngest.ts` – Enqueue a market-ingestion job via env vars.
 - `src/scripts/ingestCryptoMarkets.ts` – Targeted BTC/ETH 15m/1h market enqueue via slug derivation.
+- `src/scripts/enqueueBtcPriceIngest.ts` – Enqueue BTC price backfill job.
 
 ## Commands (justfile)
 
@@ -31,6 +32,15 @@
 ## Targeted crypto ingestion
 
 - Script `bun run src/scripts/ingestCryptoMarkets.ts` computes current/next BTC/ETH 15m/1h slugs and enqueues a market ingest using those slugs. Optional env: `CRYPTO_EXCHANGE` label passed through to ingestion.
+
+## BTC price ingestion
+
+- Queue name: `btc-price-ingestion` (BullMQ worker).
+- Script `bun run src/scripts/enqueueBtcPriceIngest.ts` accepts envs:
+  - `PRICE_SYMBOL` (default `BTCUSDT`)
+  - `PRICE_EXCHANGE` (label, default `binance`)
+  - `PRICE_START_ISO` / `PRICE_END_ISO` (optional ISO timestamps; default start = latest+interval or last 12h, end=now)
+  - `PRICE_INTERVAL_MS` (default `900000` = 15m; allowed: 1m,3m,5m,15m,30m)
 
 ## Dashboard
 

@@ -1,4 +1,4 @@
-import { type ConnectionOptions, type Job, Worker } from "bullmq";
+import { type Job, Worker } from "bullmq";
 import {
   type ListMarketsParams,
   type Market,
@@ -10,11 +10,7 @@ import { db } from "../../db";
 import { marketOutcomes, markets } from "../../db/schema";
 import type { MarketIngestionJob } from "../queues";
 import { parseDate, parseStringArray, toNumericString } from "./utils";
-
-const connection: ConnectionOptions = {
-  host: process.env.REDIS_HOST ?? "redis",
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
-};
+import { redisConnection } from "../connection";
 
 async function upsertMarket(
   market: Market,
@@ -305,7 +301,7 @@ export const marketIngestionWorker = new Worker<MarketIngestionJob>(
   "market-ingestion",
   handleIngestionJob,
   {
-    connection,
+    connection: redisConnection,
     concurrency: 5,
     removeOnComplete: { age: 3600, count: 1000 },
     removeOnFail: { count: 2000 },

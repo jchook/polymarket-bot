@@ -1,11 +1,7 @@
-import { type ConnectionOptions, Worker } from "bullmq";
+import { Worker } from "bullmq";
 import { ingestOrderbooks } from "../../ingestors/orderbookIngestor";
 import type { OrderbookIngestionJob } from "../queues";
-
-const connection: ConnectionOptions = {
-  host: process.env.REDIS_HOST ?? "redis",
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
-};
+import { redisConnection } from "../connection";
 
 async function handleOrderbookJob(job: { data: OrderbookIngestionJob }) {
   await job.log(
@@ -30,7 +26,7 @@ export const orderbookIngestionWorker = new Worker<OrderbookIngestionJob>(
   "orderbook-ingestion",
   handleOrderbookJob,
   {
-    connection,
+    connection: redisConnection,
     concurrency: 5,
     removeOnComplete: { age: 3600, count: 1000 },
     removeOnFail: { count: 2000 },

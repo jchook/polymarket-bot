@@ -50,6 +50,14 @@ export interface OrderbookIngestionJob {
   concurrency?: number;
 }
 
+export interface BtcPriceIngestionJob {
+  symbol?: string; // e.g., BTCUSDT
+  exchange?: string; // label, e.g., binance
+  start?: string; // ISO timestamp
+  end?: string; // ISO timestamp
+  intervalMs?: number; // e.g., 60000
+}
+
 export const orderbookIngestionQueue = new Queue<OrderbookIngestionJob>(
   "orderbook-ingestion",
   {
@@ -60,3 +68,14 @@ export const orderbookIngestionQueue = new Queue<OrderbookIngestionJob>(
   },
 );
 attachQueueLogging(orderbookIngestionQueue, "orderbook-ingestion");
+
+export const btcPriceIngestionQueue = new Queue<BtcPriceIngestionJob>(
+  "btc-price-ingestion",
+  {
+    connection: {
+      host: redisHost,
+      port: redisPort,
+    },
+  },
+);
+attachQueueLogging(btcPriceIngestionQueue, "btc-price-ingestion");

@@ -12,6 +12,7 @@
     "ingest:markets": "bun run src/scripts/enqueueMarketIngest.ts",
     "ingest:markets:crypto": "bun run src/scripts/ingestCryptoMarkets.ts",
     "ingest:books": "bun run src/scripts/enqueueOrderbookIngest.ts",
+    "ingest:prices:btc": "bun run src/scripts/enqueueBtcPriceIngest.ts",
     "find:arbs": "bun run src/scripts/findArbs.ts",
     "find:arbs:snapshots": "bun run src/scripts/findArbsFromSnapshots.ts",
     "find:arbs:realtime": "bun run src/scripts/realtimeArbs.ts",
