@@ -1,5 +1,5 @@
 # Base image
-FROM oven/bun:1.2-alpine AS app
+FROM oven/bun:1.2.12-alpine AS app
 VOLUME /app
 ARG USER_ID=1000
 ARG GROUP_ID=1000

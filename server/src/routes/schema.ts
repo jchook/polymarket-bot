@@ -50,6 +50,18 @@ export const OrderbookIngestionRequest = z
     description: "Parameters for orderbook ingestion",
   });
 
+export const TradeIngestionRequest = z
+  .object({
+    conditionIds: z.array(z.string().min(1)).optional(),
+    wallet: z.string().optional(),
+    exchange: z.string().optional(),
+    startAfter: z.string().optional(),
+  })
+  .openapi({
+    ref: "TradeIngestionRequest",
+    description: "Parameters for trade ingestion",
+  });
+
 export const IntraArbQuery = z
   .object({
     conditionIds: z.array(z.string()).optional(),

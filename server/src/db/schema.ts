@@ -188,6 +188,30 @@ export const btcPrices = pgTable(
   ],
 );
 
+export const tradeWatermarks = pgTable(
+  "trade_watermarks",
+  {
+    id: serial("id").primaryKey(),
+    conditionId: text("condition_id")
+      .references(() => markets.conditionId, { onDelete: "cascade" })
+      .notNull(),
+    wallet: text("wallet"),
+    scope: text("scope").notNull().default("global"), // 'global' or 'wallet'
+    lastTimestamp: timestamp("last_timestamp", { withTimezone: true }),
+    lastTradeId: text("last_trade_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_trade_watermarks_scope_condition_wallet").on(
+      table.scope,
+      table.conditionId,
+      table.wallet,
+    ),
+  ],
+);
+
 export const backtestRuns = pgTable("backtest_runs", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   strategyName: text("strategy_name").notNull(),

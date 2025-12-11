@@ -11,6 +11,8 @@
 - `src/scripts/enqueueMarketIngest.ts` – Enqueue a market-ingestion job via env vars.
 - `src/scripts/ingestCryptoMarkets.ts` – Targeted BTC/ETH 15m/1h market enqueue via slug derivation.
 - `src/scripts/enqueueBtcPriceIngest.ts` – Enqueue BTC price backfill job.
+- `src/scripts/enqueueTradeIngest.ts` – Enqueue trade ingestion job.
+- `src/scripts/backfillGabagoolTrades.ts` – Build BTC/ETH 15m/1h slugs over a date range, resolve conditionIds, enqueue market + gabagool trade ingestion.
 
 ## Commands (justfile)
 
@@ -42,6 +44,23 @@
   - `PRICE_START_ISO` / `PRICE_END_ISO` (optional ISO timestamps; default start = latest+interval or last 12h, end=now)
   - `PRICE_INTERVAL_MS` (default `900000` = 15m; allowed: 1m,3m,5m,15m,30m)
   - `PRICE_PROVIDER` (`bitstamp` default; `binance` also supported)
+
+## Trade ingestion
+
+- Queue name: `trade-ingestion` (BullMQ worker).
+- Script `bun run src/scripts/enqueueTradeIngest.ts` envs:
+  - `TRADE_CONDITION_IDS` (comma-separated; required)
+  - `TRADE_WALLET` (optional; lowercased in worker; records `user_trades` for matching maker/taker)
+  - `TRADE_EXCHANGE` (label; default `polymarket`)
+  - `TRADE_START_AFTER` (optional ISO timestamp to skip older trades)
+  - `TRADE_DELAY_MS` (optional per-condition delay; default 200ms)
+- Uses CLOB `getMarketTradesEvents`; upserts into `trades` and `user_trades`, with per-condition watermarks in `trade_watermarks`.
+
+### Gabagool backfill helper
+- Script `bun run src/scripts/backfillGabagoolTrades.ts` envs:
+  - `GABA_WALLET` (required)
+  - `GABA_START_ISO` / `GABA_END_ISO` (required; ISO timestamps in ET range to cover)
+  - Builds slugs for BTC/ETH 15m/1h over the range, resolves conditionIds via Gamma, enqueues market ingest for those conditionIds, then enqueues trade ingest for the wallet.
 
 ## Dashboard
 

@@ -5,6 +5,7 @@ import {
   marketIngestionQueue,
   orderbookIngestionQueue,
   btcPriceIngestionQueue,
+  tradeIngestionQueue,
 } from "./queues";
 
 const serverAdapter = new FastifyAdapter();
@@ -14,6 +15,7 @@ createBullBoard({
     new BullMQAdapter(marketIngestionQueue, { readOnlyMode: true }),
     new BullMQAdapter(orderbookIngestionQueue, { readOnlyMode: true }),
     new BullMQAdapter(btcPriceIngestionQueue, { readOnlyMode: true }),
+    new BullMQAdapter(tradeIngestionQueue, { readOnlyMode: true }),
   ],
   serverAdapter,
 });

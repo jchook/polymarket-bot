@@ -2,6 +2,7 @@ import {
   marketIngestionWorker,
   orderbookIngestionWorker,
   btcPriceIngestionWorker,
+  tradeIngestionWorker,
 } from "./queue/workers";
 
 console.log("Starting ingestion workers...");
@@ -11,6 +12,7 @@ const shutdown = async () => {
   await marketIngestionWorker.close();
   await orderbookIngestionWorker.close();
   await btcPriceIngestionWorker.close();
+  await tradeIngestionWorker.close();
   process.exit(0);
 };
 

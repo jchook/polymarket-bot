@@ -59,6 +59,14 @@ export interface BtcPriceIngestionJob {
   provider?: "binance" | "bitstamp";
 }
 
+export interface TradeIngestionJob {
+  conditionIds?: string[];
+  wallet?: string;
+  exchange?: string;
+  startAfter?: string; // ISO
+  delayMs?: number;
+}
+
 export const orderbookIngestionQueue = new Queue<OrderbookIngestionJob>(
   "orderbook-ingestion",
   {
@@ -80,3 +88,14 @@ export const btcPriceIngestionQueue = new Queue<BtcPriceIngestionJob>(
   },
 );
 attachQueueLogging(btcPriceIngestionQueue, "btc-price-ingestion");
+
+export const tradeIngestionQueue = new Queue<TradeIngestionJob>(
+  "trade-ingestion",
+  {
+    connection: {
+      host: redisHost,
+      port: redisPort,
+    },
+  },
+);
+attachQueueLogging(tradeIngestionQueue, "trade-ingestion");

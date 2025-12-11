@@ -2,13 +2,18 @@ import z from "zod";
 import type { App } from "../app";
 import { ConfigSchema, config } from "../app/config";
 import { getVersionString } from "../app/meta";
-import { marketIngestionQueue, orderbookIngestionQueue } from "../queue/queues";
+import {
+  marketIngestionQueue,
+  orderbookIngestionQueue,
+  tradeIngestionQueue,
+} from "../queue/queues";
 import {
   Health,
   IntraArbQuery,
   IntraArbResult,
   MarketIngestionRequest,
   OrderbookIngestionRequest,
+  TradeIngestionRequest,
 } from "./schema";
 import { fetchLatestSnapshots } from "../services/arbSnapshotService";
 import { findIntraArbs } from "../services/arbDetector";
@@ -47,6 +52,24 @@ export function withV1(app: App) {
     handler: async (req, res) => {
       const payload = req.body ?? {};
       await orderbookIngestionQueue.add("ingest-orderbooks", payload);
+      return res.status(202).send(payload);
+    },
+  });
+
+  app.route({
+    method: "POST",
+    url: "/ingest/trades",
+    schema: {
+      description: "Queue a trade ingestion job",
+      tags: ["Ingestion"],
+      body: TradeIngestionRequest,
+      response: {
+        202: TradeIngestionRequest,
+      },
+    },
+    handler: async (req, res) => {
+      const payload = req.body ?? {};
+      await tradeIngestionQueue.add("ingest-trades", payload);
       return res.status(202).send(payload);
     },
   });
