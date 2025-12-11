@@ -1,7 +1,6 @@
-// watchTrades.ts
 import { RealTimeDataClient } from "@polymarket/real-time-data-client";
 
-const TARGET = process.env.TARGET_PROXY?.toLowerCase(); // set to the wallet you want to copy
+const TARGET = process.env.TARGET_PROXY?.toLowerCase(); // wallet to watch; leave unset to see all
 
 new RealTimeDataClient({
   onConnect: (client) => {
@@ -15,22 +14,30 @@ new RealTimeDataClient({
       ],
     });
   },
-  onMessage: (client, msg) => {
+  onMessage: (_client, msg) => {
     if (msg.topic !== "activity" || msg.type !== "orders_matched") return;
     const t = msg.payload;
-    if (TARGET && t.proxyWallet?.toLowerCase() !== TARGET) return; // drop others
-    // One-line summary
+    if (TARGET && t.proxyWallet?.toLowerCase() !== TARGET) return;
+
+    // compute lag if timestamp/match_time present
+    const eventSeconds = t.match_time ?? t.timestamp ?? t.last_update;
+    const lagMs =
+      eventSeconds !== undefined
+        ? Date.now() - Number(eventSeconds) * 1000
+        : undefined;
+
     console.log(
       [
-        new Date(t.timestamp * 1000).toISOString(),
+        new Date(Date.now()).toISOString(),
         t.proxyWallet,
         t.side,
         `size=${t.size}`,
         `px=${t.price}`,
         t.slug || t.conditionId,
         t.transactionHash?.slice(0, 10),
+        lagMs !== undefined ? `lag=${lagMs}ms` : "lag=n/a",
       ].join(" | ")
     );
   },
-  //onError: (err) => console.error("RT client error:", err),
+  // onError: (err) => console.error("RT client error:", err),
 }).connect();
