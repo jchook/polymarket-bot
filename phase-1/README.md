@@ -9,6 +9,21 @@ Yeah, this makes solid sense overall. Let’s tighten it into a concrete archite
 
 ---
 
+## Implementation plan (latency-first)
+
+* Market metadata: Canonical table mapping conditionId → assetIds (UP/DOWN), tickSize, minOrderSize, negRisk, and other params.
+* Ingest: Polymarket `clob_market.price_changes` with per-asset best book cache (bid/ask/ts/hash, invalidate stale), optional `agg_orderbook` if needed. Coinbase Advanced Trade WS (`ticker`/`level2` for BTC-USD) with `heartbeats`, split high-volume products across connections, drop stale ticks (>3s).
+* State: Redis/in-memory for latest book state, EMAs, rolling vol; avoid cross-region hops.
+* Features: Rolling anchors (e.g., ln(S_t / S_{t-60s})), EMA fast/slow, rolling vol; optional window-start anchor if reliable. Keep calculations in-memory.
+* Δ_SPD thresholds: Dynamic by liquidity: δ_enter = max(0.01, 2*spread); δ_exit = max(0.005, spread); position caps 1–2% bankroll per side; max 3 legs inventory per market.
+* Regression fitter: Clamp q_t to [0.001, 0.999], weight by liquidity (e.g., 1/(spread^2+ε)), ridge regularization, align rows where |dt_ms| ≤ 250ms and store pm_ts/spot_ts/dt_ms.
+* Backtest realism: Fees, dynamic slippage (≥ spread), latency 200–400ms + queueing jitter 50–150ms, partial fills with size-at-price, cancel/replace delays.
+* Execution: Limits relative to book (BUY at min(bestAsk, q_t + maxPaySlippage); SELL at max(bestBid, q_t - maxPaySlippage)); IOC/maker with 1s cancel/replace; circuit-breakers on price divergence or signal flip.
+* Observability/time: Enforce NTP/monotonic clocks; log exchange_ts vs receive_ts; dashboards for missing bid/ask %, dt_ms histograms, spreads, gap counters; alert on heartbeat/data silence >5s.
+* Unified pipeline: Same event-driven code paths for ingest → feature calc → Δ_SPD → trade intents in both backtest (replay from storage) and live (websockets); only the event source/sink swaps.
+
+---
+
 ## 1. Review + improvements to your plan
 
 ### Databases

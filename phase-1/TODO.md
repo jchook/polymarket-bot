@@ -1,14 +1,12 @@
-High-level TODO outline based on README guidance:
+Master TODO (checklist of cohesive units of work):
 
-- Database layer: Decide on Postgres vs Postgres+Timescale; create schemas for btc_spot_ticks, pm_price_changes, derived_features, simulated_trades, and strategy_params (stores β and thresholds).
-- Caching/state: Stand up Redis namespaces for latest ticks, EMAs/vol, and coordination queues (e.g., BullMQ) if needed.
-- Polymarket ingest: Implement websocket client for `clob_market.price_changes` (and optional `agg_orderbook`), persist mid/bid/ask with filters for target assets.
-- Coinbase ingest: Add websocket client for BTC-USD ticker/trades with heartbeat/reconnect; persist bid/ask/mid ticks.
-- Feature computation: Build rolling EMA/volatility calculator sharing logic for live and backtest; define S0/window reset rules.
-- Δ_SPD model: Implement regression fitter over historical joins (logit(q_t) vs features), persist β to DB, and load into runtime.
-- Strategy logic: Compute Δ_SPD in real time, apply enter/exit thresholds, inventory/risk controls, and emit normalized trade intents.
-- Backtester: Replay joined historical streams, feed shared feature/strategy pipeline, and record PnL/metrics with configurable fee/slippage assumptions.
-- Ops/monitoring: Add basic logging/alerts for feed liveness, DB/Redis health, and strategy anomalies; supply env/config templates.
-- Market metadata: Create canonical table mapping conditionId → assetIds, tickSize, minOrderSize, negRisk flags, etc.
-- Time sync: Enforce NTP/monotonic timestamps; record exchange timestamp vs receive timestamp for alignment metrics.
-- Data quality: Build dashboard/metrics for missing bid/ask %, dt_ms histogram between PM and spot, spread distribution, and feed gap counters.
+- [ ] Database/timeseries: Decide Postgres vs Postgres+Timescale; define schemas for btc_spot_ticks, pm_price_changes (with best bid/ask), derived_features, simulated_trades, strategy_params (β, thresholds), and market_metadata (conditionId → assetIds, tick sizes, etc.).
+- [ ] Redis/state layer: Stand up namespaces for latest best-book per asset, EMAs/vol, coordination queues; enforce low-latency access and eviction/TTL for stale books.
+- [ ] Polymarket ingest: Implement `clob_market.price_changes` client with per-asset best-book cache (bid/ask/ts/hash), filters for target assets, persistence, and optional `agg_orderbook` if needed.
+- [ ] Coinbase ingest: Implement Advanced Trade WS (`ticker`/`level2` for BTC-USD) with `heartbeats`, split high-volume topics across connections, stale-tick rejection, auto-reconnect/resubscribe, and persistence.
+- [ ] Feature pipeline: Build shared rolling calculators (ln(S_t/S_{t-60s}), EMA fast/slow, rolling vol, optional window anchor) for live + backtest; keep state in-memory/Redis.
+- [ ] Unified event pipeline: One event-driven path (ingest → features → Δ_SPD → trade intents) with pluggable sources (websocket vs replay) and sinks (orders vs simulated fills) to keep backtests faithful to live behavior.
+- [ ] Δ_SPD model fitter: Materialize training rows with aligned pm/spot timestamps (store dt_ms), clamp q_t, apply liquidity weights, ridge regularization; persist β/version/λ in strategy_params; provide hot-reload path.
+- [ ] Strategy/execution: Compute Δ_SPD with dynamic thresholds (spread-aware), inventory/risk caps, book-relative limit/IOC pricing, cancel/replace cadence, circuit-breakers; wire to order gateway.
+- [ ] Backtester: Replay joined historical streams, apply latency/slippage/queueing jitter and partial fills, record simulated_trades and PnL/metrics; configurable fee/slippage/latency params.
+- [ ] Observability/time sync: Enforce NTP/monotonic clocks; log exchange_ts vs receive_ts; alerts for heartbeat/data silence; dashboards for missing bid/ask %, dt_ms histogram, spread distribution, gap counters.

@@ -9,7 +9,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "dev": "bun run src/index.ts",
-    "ingest:trades:realtime": "bun run src/scripts/ingestRealtimeTrades.ts"
+    "ingest:trades:realtime": "bun run src/scripts/ingestRealtimeTrades.ts",
+    "ingest:pm:price-changes": "bun run src/scripts/ingestPolymarketPriceChanges.ts",
+    "ingest:coinbase:ticker": "bun run src/scripts/ingestCoinbaseTicker.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^5.0.0",
