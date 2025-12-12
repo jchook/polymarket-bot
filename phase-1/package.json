@@ -1,0 +1,36 @@
+{
+  "name": "polymarket-bot",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "dev": "bun run src/index.ts",
+    "ingest:trades:realtime": "bun run src/scripts/ingestRealtimeTrades.ts"
+  },
+  "dependencies": {
+    "@polymarket/clob-client": "^5.0.0",
+    "@polymarket/real-time-data-client": "^1.4.0",
+    "@scalar/fastify-api-reference": "^1.29.3",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.41.0",
+    "drizzle-seed": "^0.3.1",
+    "drizzle-zod": "^0.7.1",
+    "pg": "^8.16.3",
+    "typescript": "^5.8.3",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.30.6",
+    "globals": "^16.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
