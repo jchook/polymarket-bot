@@ -1,2 +1,0 @@
-#!/bin/sh
-curl localhost:3000/meta/docs/json

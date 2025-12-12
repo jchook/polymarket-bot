@@ -1,2 +1,0 @@
-#!/bin/sh
-git describe --tags --abbrev=0 2>/dev/null || git rev-parse HEAD
