@@ -1,0 +1,29 @@
+set positional-arguments := true
+
+# List all the commands
+list:
+  just --list
+
+# Drizzle Kit shortcut
+db *args="--help":
+  docker compose exec app bun drizzle-kit "$@"
+
+# View docker logs
+logs:
+  docker compose logs -f
+
+# Interactive shell on the api server
+sh:
+  docker compose exec app zsh
+
+# Run bun
+bun *args="run":
+  docker compose exec app bun "$@"
+
+# Start the server
+up *args="--menu":
+  HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up --build --wait "$@"
+
+prod *args="up":
+  docker compose -f docker-compose.prod.yml "$@"
+

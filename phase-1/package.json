@@ -11,17 +11,24 @@
     "dev": "bun run src/index.ts",
     "ingest:trades:realtime": "bun run src/scripts/ingestRealtimeTrades.ts",
     "ingest:pm:price-changes": "bun run src/scripts/ingestPolymarketPriceChanges.ts",
-    "ingest:coinbase:ticker": "bun run src/scripts/ingestCoinbaseTicker.ts"
+    "ingest:coinbase:ticker": "bun run src/scripts/ingestCoinbaseTicker.ts",
+    "backtest:run": "bun run src/scripts/runBacktest.ts",
+    "backtest:fingerprint": "bun run src/scripts/fingerprintRun.ts",
+    "backtest:polymarket:micro-mm": "bun run src/scripts/backtestPolymarketMicroMm.ts",
+    "discover:polymarket:markets": "bun run src/scripts/discoverPolymarketMarkets.ts"
   },
   "dependencies": {
-    "@polymarket/clob-client": "^5.0.0",
+    "@polymarket/clob-client": "^5.1.0",
     "@polymarket/real-time-data-client": "^1.4.0",
     "@scalar/fastify-api-reference": "^1.29.3",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.41.0",
     "drizzle-seed": "^0.3.1",
     "drizzle-zod": "^0.7.1",
+    "node-redis": "^0.1.7",
     "pg": "^8.16.3",
+    "polymarket-data": "^0.0.1",
+    "redis": "^4.7.0",
     "typescript": "^5.8.3",
     "zod": "^3.25.28"
   },

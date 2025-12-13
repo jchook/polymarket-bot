@@ -1,3 +1,7 @@
+# Inventory-bounded mean-reversion micro-MM strategy
+
+As long as BTC chop is high and the Polymarket book is thin, the edge is enormous.
+
 Speed is the moat: every decision, system, and deployment choice must minimize latency, especially on remote signal ingestion and order placement/cancel/closure. Optimize for microseconds where possible; correctness assumes low latency by default.
 
 Yeah, this makes solid sense overall. Let’s tighten it into a concrete architecture, then I’ll give you:

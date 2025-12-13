@@ -1,4 +1,5 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type * as schema from "../db/schema";
 import { pmPriceChanges, tradeSideEnum } from "../db/schema";
 
 export type PriceChange = {
@@ -14,6 +15,7 @@ export type PriceChange = {
 export type PriceChangesEvent = {
   conditionId: string;
   timestampMs: number;
+  ingestTs: number;
   changes: PriceChange[];
 };
 
@@ -24,11 +26,20 @@ export type BestBook = {
   hash?: string;
 };
 
+type Database = NodePgDatabase<typeof schema>;
+
 export type PmProcessorOptions = {
-  db: NodePgDatabase;
+  db: Database;
   bestBooks: Map<string, BestBook>;
   targetAssets: string[];
   staleMs: number;
+  onBestBookUpdated?: (
+    assetId: string,
+    book: BestBook,
+    mid: number | null,
+    exchangeTs: number,
+    ingestTs: number,
+  ) => void | Promise<void>;
 };
 
 function updateBestBook(
@@ -50,7 +61,11 @@ function updateBestBook(
   return next;
 }
 
-function computeMid(book: BestBook, ts: number, staleMs: number): number | null {
+function computeMid(
+  book: BestBook,
+  ts: number,
+  staleMs: number,
+): number | null {
   const isStale = ts - book.updatedAt > staleMs;
   if (!book.bestBid || !book.bestAsk || isStale) return null;
   return (book.bestBid + book.bestAsk) / 2;
@@ -61,14 +76,26 @@ export async function processPmPriceChangesEvent(
   opts: PmProcessorOptions,
 ) {
   const { db, bestBooks, targetAssets, staleMs } = opts;
-  const ts = Number.isFinite(event.timestampMs) ? event.timestampMs : Date.now();
+  const exchangeTs = Number.isFinite(event.timestampMs)
+    ? event.timestampMs
+    : event.ingestTs;
 
   for (const change of event.changes) {
     const assetId = change.a;
     if (targetAssets.length > 0 && !targetAssets.includes(assetId)) continue;
 
-    const book = updateBestBook(bestBooks, assetId, change, ts);
-    const mid = computeMid(book, ts, staleMs);
+    const book = updateBestBook(bestBooks, assetId, change, exchangeTs);
+    const mid = computeMid(book, exchangeTs, staleMs);
+
+    if (opts.onBestBookUpdated) {
+      await opts.onBestBookUpdated(
+        assetId,
+        book,
+        mid,
+        exchangeTs,
+        event.ingestTs,
+      );
+    }
 
     await db
       .insert(pmPriceChanges)
@@ -85,7 +112,7 @@ export async function processPmPriceChangesEvent(
         bestBid: change.bb ?? book.bestBid?.toString() ?? null,
         bestAsk: change.ba ?? book.bestAsk?.toString() ?? null,
         midPrice: mid ? mid.toString() : null,
-        timestamp: new Date(ts),
+        timestamp: new Date(exchangeTs),
         raw: change,
       })
       .onConflictDoNothing();

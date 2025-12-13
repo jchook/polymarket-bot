@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -9,7 +10,6 @@ import {
   text,
   timestamp,
   uniqueIndex,
-  boolean,
 } from "drizzle-orm/pg-core";
 
 export const tradeSideEnum = pgEnum("trade_side", ["BUY", "SELL"]);
@@ -83,12 +83,14 @@ export const pmPriceChanges = pgTable(
   ],
 );
 
-export const btcSpotTicks = pgTable(
-  "btc_spot_ticks",
+export const spotPrices = pgTable(
+  "spot_prices",
   {
     id: serial("id").primaryKey(),
     exchange: text("exchange").notNull(),
     productId: text("product_id").notNull(),
+    baseAsset: text("base_asset"),
+    quoteAsset: text("quote_asset"),
     bestBid: numeric("best_bid"),
     bestAsk: numeric("best_ask"),
     midPrice: numeric("mid_price"),
@@ -98,8 +100,13 @@ export const btcSpotTicks = pgTable(
     raw: jsonb("raw"),
   },
   (table) => [
-    index("idx_btc_spot_ticks_ts").on(table.timestamp),
-    index("idx_btc_spot_ticks_product_ts").on(table.productId, table.timestamp),
+    index("idx_spot_prices_ts").on(table.timestamp),
+    index("idx_spot_prices_product_ts").on(table.productId, table.timestamp),
+    index("idx_spot_prices_pair_ts").on(
+      table.baseAsset,
+      table.quoteAsset,
+      table.timestamp,
+    ),
   ],
 );
 
@@ -110,7 +117,9 @@ export const derivedFeatures = pgTable(
     conditionId: text("condition_id").notNull(),
     assetId: text("asset_id").notNull(),
     pmTimestamp: timestamp("pm_timestamp", { withTimezone: true }).notNull(),
-    spotTimestamp: timestamp("spot_timestamp", { withTimezone: true }).notNull(),
+    spotTimestamp: timestamp("spot_timestamp", {
+      withTimezone: true,
+    }).notNull(),
     dtMs: integer("dt_ms").notNull(),
     pmMid: numeric("pm_mid"),
     pmSpread: numeric("pm_spread"),
@@ -167,6 +176,35 @@ export const simulatedTrades = pgTable(
     index("idx_simulated_trades_condition_ts").on(
       table.conditionId,
       table.timestamp,
+    ),
+  ],
+);
+
+export const dislocationSignals = pgTable(
+  "dislocation_signals",
+  {
+    id: serial("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    conditionId: text("condition_id").notNull(),
+    assetId: text("asset_id").notNull(),
+    exchangeTs: timestamp("exchange_ts", { withTimezone: true }).notNull(),
+    ingestTs: timestamp("ingest_ts", { withTimezone: true }).notNull(),
+    dtMs: integer("dt_ms"),
+    pmMid: numeric("pm_mid"),
+    expectedProb: numeric("expected_prob"),
+    deltaSpd: numeric("delta_spd"),
+    state: text("state"),
+    featuresVersion: text("features_version"),
+    betaVersion: text("beta_version"),
+    orderingCollision: boolean("ordering_collision").default(false).notNull(),
+    raw: jsonb("raw"),
+  },
+  (table) => [
+    index("idx_dislocation_signals_run_ts").on(table.runId, table.exchangeTs),
+    index("idx_dislocation_signals_condition_asset_ts").on(
+      table.conditionId,
+      table.assetId,
+      table.exchangeTs,
     ),
   ],
 );

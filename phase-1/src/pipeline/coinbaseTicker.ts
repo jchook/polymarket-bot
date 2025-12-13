@@ -1,5 +1,8 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { btcSpotTicks } from "../db/schema";
+import type * as schema from "../db/schema";
+import { spotPrices } from "../db/schema";
+
+type Database = NodePgDatabase<typeof schema>;
 
 export type CoinbaseTickerMessage = {
   type: "ticker";
@@ -12,9 +15,17 @@ export type CoinbaseTickerMessage = {
 };
 
 export type CoinbaseProcessorOptions = {
-  db: NodePgDatabase;
+  db: Database;
   productIds: string[];
   staleMs: number;
+  onSpotPrice?: (
+    productId: string,
+    baseAsset: string | undefined,
+    quoteAsset: string | undefined,
+    mid: number | undefined,
+    exchangeTs: number,
+    ingestTs: number,
+  ) => void | Promise<void>;
 };
 
 export async function processCoinbaseTicker(
@@ -25,8 +36,11 @@ export async function processCoinbaseTicker(
   const productId = msg.product_id;
   if (!productId || !productIds.includes(productId)) return;
 
+  const [baseAsset, quoteAsset] = productId.split("-");
+
   const ts = msg.time ? Date.parse(msg.time) : Date.now();
-  if (!Number.isFinite(ts) || Date.now() - ts > staleMs) return;
+  const ingestTs = Date.now();
+  if (!Number.isFinite(ts) || ingestTs - ts > staleMs) return;
 
   const bestBid = msg.best_bid ? Number(msg.best_bid) : undefined;
   const bestAsk = msg.best_ask ? Number(msg.best_ask) : undefined;
@@ -37,11 +51,17 @@ export async function processCoinbaseTicker(
         ? Number(msg.price)
         : undefined;
 
+  if (opts.onSpotPrice) {
+    await opts.onSpotPrice(productId, baseAsset, quoteAsset, mid, ts, ingestTs);
+  }
+
   await db
-    .insert(btcSpotTicks)
+    .insert(spotPrices)
     .values({
       exchange: "coinbase",
       productId,
+      baseAsset: baseAsset ?? null,
+      quoteAsset: quoteAsset ?? null,
       bestBid: bestBid?.toString() ?? null,
       bestAsk: bestAsk?.toString() ?? null,
       midPrice: mid?.toString() ?? null,

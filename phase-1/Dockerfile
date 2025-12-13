@@ -11,6 +11,31 @@ RUN deluser bun \
 
 # ---
 
+# Development environment
+FROM app AS app-dev
+RUN apk update \
+  && apk add --no-cache \
+    zsh git curl wget less openssh neovim fzf \
+    zsh-autosuggestions zsh-syntax-highlighting zsh-history-substring-search \
+    bash-completion coreutils starship \
+  && sed -i 's~:/bin/sh$~:/bin/zsh~' /etc/passwd \
+  && ln -s -f /bin/zsh
+RUN bun add -g @anthropic-ai/claude-code
+ENV STARSHIP_CONFIG=/etc/starship.toml \
+  HISTFILE=/home/app/.zsh/zsh_history \
+  HISTSIZE=100000 \
+  SAVEHIST=100000 \
+  TERM=xterm-256color
+USER ${USER_ID}:${GROUP_ID}
+COPY --chown=${USER_ID}:${GROUP_ID} ./etc/home/ /home/app/
+COPY ./etc/starship.toml /etc/starship.toml
+WORKDIR /app
+VOLUME /home/app/.claude
+CMD ["/bin/zsh"]
+
+
+# ---
+
 # Server runtime
 FROM app AS server
 RUN  mkdir -p /mnt/documents /mnt/artifacts \

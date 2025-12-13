@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
 import { RealTimeDataClient } from "@polymarket/real-time-data-client";
+import dotenv from "dotenv";
 import { db } from "../db";
 import { realtimeTrades, tradeSideEnum } from "../db/schema";
 
@@ -71,8 +71,8 @@ async function persistTrade(payload: TradePayload) {
     [
       payload.side,
       payload.outcome,
-      payload.size + 'x',
-      '@' + payload.price,
+      `${payload.size}x`,
+      `@${payload.price}`,
       payload.slug,
     ]
       .filter(Boolean)
@@ -100,5 +100,5 @@ new RealTimeDataClient({
       console.error("Failed to persist trade", err);
     });
   },
-  onStatusChange: (status) => console.log("Connection status:" + status),
+  onStatusChange: (status) => console.log(`Connection status:${status}`),
 }).connect();

@@ -1,0 +1,15 @@
+import {
+  type ListMarketsParams,
+  type Market,
+  Polymarket,
+} from "polymarket-data";
+
+const client = new Polymarket({
+  gammaEndpoint: process.env.GAMMA_BASE_URL,
+});
+
+export async function listGammaMarkets(
+  params: ListMarketsParams = {},
+): Promise<Market[]> {
+  return client.gamma.markets.listMarkets(params);
+}

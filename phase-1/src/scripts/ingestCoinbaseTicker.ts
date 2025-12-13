@@ -1,9 +1,10 @@
 import dotenv from "dotenv";
 import { db } from "../db";
 import {
-  processCoinbaseTicker,
   type CoinbaseTickerMessage,
+  processCoinbaseTicker,
 } from "../pipeline/coinbaseTicker";
+import { handleUnifiedEvent } from "../pipeline/unifiedEventConsumer";
 
 dotenv.config();
 
@@ -21,8 +22,7 @@ const PRODUCT_IDS = (process.env.COINBASE_PRODUCTS || "BTC-USD")
   .filter(Boolean);
 
 const WS_URL =
-  process.env.COINBASE_WS_URL ||
-  "wss://advanced-trade-ws.coinbase.com";
+  process.env.COINBASE_WS_URL || "wss://advanced-trade-ws.coinbase.com";
 
 const STALE_MS = Number(process.env.COINBASE_STALE_MS ?? 3_000);
 
@@ -41,7 +41,10 @@ ws.addEventListener("open", () => {
   };
   ws.send(JSON.stringify(subscribe));
   ws.send(JSON.stringify(heartbeats));
-  console.log("Connected to Coinbase WS", { url: WS_URL, products: PRODUCT_IDS });
+  console.log("Connected to Coinbase WS", {
+    url: WS_URL,
+    products: PRODUCT_IDS,
+  });
 });
 
 ws.addEventListener("message", (event) => {
@@ -53,16 +56,36 @@ ws.addEventListener("message", (event) => {
     return;
   }
 
-  const msg = parsed as Partial<CoinbaseTickerMessage & HeartbeatMessage>;
-  if (msg.type === "heartbeat") {
-    return;
-  }
-  if (msg.type !== "ticker") return;
+  if (typeof parsed !== "object" || parsed === null) return;
+  const type = (parsed as { type?: unknown }).type;
+  if (type !== "ticker" && type !== "heartbeat") return;
 
-  void processCoinbaseTicker(msg as CoinbaseTickerMessage, {
+  if (type === "heartbeat") return;
+
+  const msg = parsed as CoinbaseTickerMessage;
+
+  void processCoinbaseTicker(msg, {
     db,
     productIds: PRODUCT_IDS,
     staleMs: STALE_MS,
+    onSpotPrice: async (
+      productId,
+      baseAsset,
+      quoteAsset,
+      mid,
+      exchangeTs,
+      ingestTs,
+    ) => {
+      await handleUnifiedEvent({
+        kind: "spot",
+        productId,
+        baseAsset,
+        quoteAsset,
+        mid,
+        exchangeTs,
+        ingestTs,
+      });
+    },
   }).catch((err) => console.error("Failed to persist Coinbase tick", err));
 });
 
