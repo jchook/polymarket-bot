@@ -14,7 +14,7 @@ dotenv.config();
 
 type PriceChangesMessage = {
   topic: "clob_market";
-  type: "price_changes";
+  type: "price_change";
   payload: {
     m: string; // conditionId
     pc: PriceChangesEvent["changes"];
@@ -37,7 +37,7 @@ export function startPolymarketPriceFeed(options: {
   const targetAssets =
     options.targetAssets && options.targetAssets.length > 0
       ? options.targetAssets
-      : undefined;
+      : null;
 
   const bestBooks = new Map<string, BestBook>();
   const client = new RealTimeDataClient({
@@ -47,14 +47,14 @@ export function startPolymarketPriceFeed(options: {
         subscriptions: [
           {
             topic: "clob_market",
-            type: "price_changes",
+            type: "price_change",
             filters,
           },
         ],
       });
     },
     onMessage: (_client, msg) => {
-      if (msg.topic !== "clob_market" || msg.type !== "price_changes") return;
+      if (msg.topic !== "clob_market" || msg.type !== "price_change") return;
       void handlePriceChanges(msg as PriceChangesMessage).catch((err) => {
         console.error("Failed to persist price_change", err);
       });
@@ -64,17 +64,20 @@ export function startPolymarketPriceFeed(options: {
   });
 
   const currentFilters = () => {
-    const assets = targetAssets ?? catalog.getActiveAssetIds();
-    return assets.length > 0 ? assets.join(",") : undefined;
+    const assets =
+      targetAssets && targetAssets.length > 0
+        ? targetAssets
+        : catalog.getActiveAssetIds();
+    return assets.length > 0 ? JSON.stringify(assets) : undefined;
   };
 
   const resubscribe = (assets: string[]) => {
-    const filters = assets.length > 0 ? assets.join(",") : undefined;
+    const filters = assets.length > 0 ? JSON.stringify(assets) : undefined;
     client.subscribe({
       subscriptions: [
         {
           topic: "clob_market",
-          type: "price_changes",
+          type: "price_change",
           filters,
         },
       ],
@@ -84,17 +87,28 @@ export function startPolymarketPriceFeed(options: {
   async function handlePriceChanges(msg: PriceChangesMessage) {
     const tsMs = Number(msg.payload.t);
     const ingestTs = Date.now();
+    const changes = Array.isArray(msg.payload.pc)
+      ? msg.payload.pc
+      : [];
+    if (changes.length === 0) {
+      console.warn("Skipping price_change with no price_changes array", {
+        topic: msg.topic,
+        type: msg.type,
+        payloadKeys: Object.keys(msg.payload || {}),
+      });
+      return;
+    }
     const event: PriceChangesEvent = {
       conditionId: msg.payload.m,
       timestampMs: Number.isFinite(tsMs) ? tsMs : ingestTs,
       ingestTs,
-      changes: msg.payload.pc,
+      changes,
     };
 
     await processPmPriceChangesEvent(event, {
       db,
       bestBooks,
-      targetAssets,
+      targetAssets: targetAssets ?? [],
       staleMs,
       onBestBookUpdated: async (assetId, book, mid, exchangeTs) => {
         await handleUnifiedEvent(
@@ -120,7 +134,7 @@ export function startPolymarketPriceFeed(options: {
   }
 
   catalog.onUpdate((markets) => {
-    if (targetAssets) return; // manual override, do not resubscribe
+    if (targetAssets && targetAssets.length > 0) return; // manual override, do not resubscribe
     const assets = markets.flatMap((m) => m.assetIds);
     resubscribe(assets);
   });

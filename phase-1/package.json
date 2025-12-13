@@ -15,7 +15,9 @@
     "backtest:run": "bun run src/scripts/runBacktest.ts",
     "backtest:fingerprint": "bun run src/scripts/fingerprintRun.ts",
     "backtest:polymarket:micro-mm": "bun run src/scripts/backtestPolymarketMicroMm.ts",
-    "discover:polymarket:markets": "bun run src/scripts/discoverPolymarketMarkets.ts"
+    "discover:polymarket:markets": "bun run src/scripts/discoverPolymarketMarkets.ts",
+    "collect:polymarket:micro-mm": "bun run src/scripts/polymarketMicroMm.ts",
+    "live:polymarket:micro-mm": "MODE=live bun run src/scripts/polymarketMicroMm.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^5.1.0",

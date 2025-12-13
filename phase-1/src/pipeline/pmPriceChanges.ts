@@ -6,10 +6,12 @@ export type PriceChange = {
   a: string; // asset_id
   h?: string; // hash
   p: string; // price
-  s: "BUY" | "SELL";
-  si: string; // size
+  s?: string; // size OR side (polymarket payload uses s for size, si for side)
+  si?: string; // side (BUY/SELL) OR size depending on feed
   ba?: string; // best ask
   bb?: string; // best bid
+  size?: string; // alternative size field
+  side?: string; // alternative side field
 };
 
 export type PriceChangesEvent = {
@@ -87,6 +89,13 @@ export async function processPmPriceChangesEvent(
     const book = updateBestBook(bestBooks, assetId, change, exchangeTs);
     const mid = computeMid(book, exchangeTs, staleMs);
 
+    const sideRaw = (change.side ?? change.si ?? change.s ?? "").toUpperCase();
+    const side =
+      sideRaw === "SELL"
+        ? tradeSideEnum.enumValues[1]
+        : tradeSideEnum.enumValues[0];
+    const size = change.size ?? change.s ?? change.si ?? null;
+
     if (opts.onBestBookUpdated) {
       await opts.onBestBookUpdated(
         assetId,
@@ -103,12 +112,9 @@ export async function processPmPriceChangesEvent(
         conditionId: event.conditionId,
         assetId,
         hash: change.h ?? null,
-        side:
-          change.s === "BUY"
-            ? tradeSideEnum.enumValues[0]
-            : tradeSideEnum.enumValues[1],
+        side,
         price: change.p ?? null,
-        size: change.si ?? null,
+        size,
         bestBid: change.bb ?? book.bestBid?.toString() ?? null,
         bestAsk: change.ba ?? book.bestAsk?.toString() ?? null,
         midPrice: mid ? mid.toString() : null,

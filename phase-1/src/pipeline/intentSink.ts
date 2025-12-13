@@ -3,7 +3,7 @@ import { persistSignals } from "./signalPersistence";
 import type { PipelineOutput } from "./unifiedEventConsumer";
 
 export type PipelineContext = {
-  mode: "live" | "backtest";
+  mode: "live" | "backtest" | "collect";
   featuresVersion?: string;
   betaVersion?: string;
   conditionId?: string;
@@ -68,5 +68,38 @@ export class BacktestIntentSink implements IntentSink {
   async flushToDb() {
     if (this.entries.length === 0) return;
     await persistSignals(this.runId, this.entries);
+  }
+}
+
+export class CollectIntentSink implements IntentSink {
+  private entries: Array<{
+    signal: DislocationSignal;
+    state: PipelineOutput["state"];
+    ctx: PipelineContext;
+    dtMs?: number;
+    orderingCollision?: boolean;
+  }> = [];
+  private runId: string;
+
+  constructor(runId: string) {
+    this.runId = runId;
+  }
+
+  handle(output: PipelineOutput, ctx: PipelineContext) {
+    if (output.dislocation) {
+      this.entries.push({
+        signal: output.dislocation,
+        state: output.state,
+        ctx,
+        orderingCollision: output.orderingCollision,
+        dtMs: output.dtMs ?? undefined,
+      });
+    }
+  }
+
+  async flushToDb() {
+    if (this.entries.length === 0) return;
+    await persistSignals(this.runId, this.entries);
+    this.entries = [];
   }
 }
