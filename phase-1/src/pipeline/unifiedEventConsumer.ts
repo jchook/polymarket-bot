@@ -1,5 +1,6 @@
 // Invariant: All live and replay processing must flow through this consumer. No alternate feature
 // or Δ_SPD computation paths are allowed.
+import { randomUUID } from "node:crypto";
 import {
   type BetaParams,
   type DislocationSignal,
@@ -18,6 +19,7 @@ import {
   setBestBookState,
   setSpotState,
 } from "../state/hotState";
+import { logger } from "../lib/logger";
 import type { IntentSink, PipelineContext } from "./intentSink";
 import type { BestBook } from "./pmPriceChanges";
 
@@ -44,14 +46,22 @@ export type PmBookEvent = {
 
 export type UnifiedEvent = SpotTickEvent | PmBookEvent;
 
-export type TradeIntent = {
-  kind: "noop";
+export type OrderIntent = {
+  intentId: string;
+  runId: string;
+  conditionId: string;
+  assetId: string;
+  side: "BUY" | "SELL";
+  price: number;
+  size: number;
+  createdTs: number;
+  reason: "DELTA_SPD" | "MM_REBALANCE";
 };
 
 export type PipelineOutput = {
   features?: ReturnType<FeatureEngine["update"]>;
   dislocation?: DislocationSignal | null;
-  intent?: TradeIntent | null;
+  intent?: OrderIntent | null;
   state: TraderState;
   orderingCollision?: boolean;
   dtMs?: number | null;
@@ -75,6 +85,72 @@ let currentState: TraderState = INITIAL_STATE;
 let lastEventTs: number | null = null;
 let lastEventKind: UnifiedEvent["kind"] | null = null;
 let collisionCount = 0;
+const log = logger("pipeline");
+
+type Position = {
+  inventory: number;
+  pending: number;
+  lastIntentId?: string;
+  lastUnwindIntentId?: string;
+  lastUnwindTs?: number;
+};
+
+const positions: Map<string, Position> = new Map(); // key = conditionId|assetId
+const runId = process.env.RUN_ID || randomUUID();
+const intentThreshold = Number(process.env.INTENT_DELTA_THRESHOLD ?? 0.01);
+const inventoryCap = Number(process.env.INTENT_INVENTORY_CAP ?? 100);
+const orderSize = Number(process.env.INTENT_ORDER_SIZE ?? 1);
+const unwindStartFrac = Number(process.env.UNWIND_START_FRAC ?? 0.5);
+const unwindAggressiveFrac = Number(process.env.UNWIND_AGGRESSIVE_FRAC ?? 0.8);
+const unwindMinEdgeTicks = Number(process.env.UNWIND_MIN_EDGE_TICKS ?? 1);
+const unwindCooldownMs = Number(process.env.UNWIND_COOLDOWN_MS ?? 500);
+const defaultTickSize = Number(process.env.UNWIND_TICK_SIZE ?? 0.01);
+
+export type FillEvent = {
+  intentId: string;
+  conditionId: string;
+  assetId: string;
+  side: "BUY" | "SELL";
+  filledSize: number;
+  price: number;
+  timestamp: number;
+  partial: boolean;
+};
+
+export type FailEvent = {
+  intentId: string;
+  conditionId: string;
+  assetId: string;
+  side: "BUY" | "SELL";
+  size: number;
+  timestamp: number;
+  reason?: string;
+};
+
+function positionKey(conditionId?: string, assetId?: string) {
+  return `${conditionId ?? "unknown"}|${assetId ?? "unknown"}`;
+}
+
+function signed(side: "BUY" | "SELL", size: number) {
+  return side === "BUY" ? size : -size;
+}
+
+function roundDownToTick(price: number, tick: number) {
+  return Math.floor(price / tick) * tick;
+}
+
+function roundUpToTick(price: number, tick: number) {
+  return Math.ceil(price / tick) * tick;
+}
+
+function assertPositionInvariant(pos: Position, cap: number) {
+  if (Math.abs(pos.inventory) > cap + 1e-6) {
+    throw new Error("Inventory cap violated");
+  }
+  if (Math.abs(pos.pending) > cap + 1e-6) {
+    throw new Error("Pending cap violated");
+  }
+}
 
 function getEngine(key: string): FeatureEngine {
   let engine = featureEngines.get(key);
@@ -261,15 +337,18 @@ async function handlePmBook(
   }
   maybeLogTransition(prevState, currentState, health, betaBlocked(ctx));
 
+  const intent = maybeEmitIntent(event, dislocation, ctx);
+  const unwindIntent = intent ? null : maybeEmitUnwindIntent(event);
+
   const output = {
     features,
     dislocation,
-    intent: null,
+    intent: intent ?? unwindIntent,
     state: currentState,
     orderingCollision: detectCollision(event),
     dtMs,
   };
-  logPmAndFeatures(event, features, dislocation, currentState);
+  logPmAndFeatures(event, features, dislocation, currentState, intent);
   sink?.handle(output, ctx);
   return output;
 }
@@ -288,8 +367,9 @@ function logPmAndFeatures(
   features: ReturnType<FeatureEngine["update"]> | undefined,
   dislocation: DislocationSignal | null,
   state: TraderState,
+  intent?: OrderIntent | null,
 ) {
-  console.log("pm_event", {
+  log("pm_event %o", {
     assetId: event.assetId,
     mid: event.mid,
     bestBid: event.bestBid,
@@ -299,6 +379,7 @@ function logPmAndFeatures(
     features,
     dislocation,
     state,
+    intent,
   });
 }
 
@@ -343,7 +424,7 @@ function maybeLogTransition(
   if (!health.featuresReady) causes.push("featuresInvalid");
   if (!health.latencyOk) causes.push("clockSkewBad");
   if (betaBlock) causes.push("betaBlocked");
-  console.log("state_transition", {
+  log("state_transition %o", {
     from: prev,
     to: next,
     causes,
@@ -352,4 +433,155 @@ function maybeLogTransition(
     latencyMs: health.latencyMs,
     collisionCount,
   });
+}
+
+function maybeEmitIntent(
+  event: PmBookEvent,
+  dislocation: DislocationSignal | null,
+  ctx: PipelineContext,
+): OrderIntent | null {
+  void ctx;
+  if (!dislocation) return null;
+  if (currentState !== "RUNNING") return null;
+  if (!event.conditionId || !event.assetId) return null;
+  if (dislocation.deltaSPD === undefined) return null;
+  if (event.bestBid === undefined || event.bestAsk === undefined) return null;
+
+  const delta = dislocation.deltaSPD;
+  if (Math.abs(delta) < intentThreshold) return null;
+
+  const key = positionKey(event.conditionId, event.assetId);
+  const pos = positions.get(key) ?? { inventory: 0, pending: 0 };
+
+  const side: "BUY" | "SELL" = delta > 0 ? "BUY" : "SELL";
+  const projected =
+    side === "BUY"
+      ? pos.inventory + pos.pending + orderSize
+      : pos.inventory + pos.pending - orderSize;
+  if (Math.abs(projected) > inventoryCap) return null;
+
+  const price = side === "BUY" ? event.bestBid : event.bestAsk;
+  const intentKey = [
+    event.conditionId,
+    event.assetId,
+    side,
+    price.toFixed(4),
+    orderSize,
+  ].join("|");
+
+  if (pos.pending !== 0 && pos.lastIntentId === intentKey) {
+    return null;
+  }
+
+  const intent: OrderIntent = {
+    intentId: intentKey,
+    runId,
+    conditionId: event.conditionId,
+    assetId: event.assetId,
+    side,
+    price,
+    size: orderSize,
+    createdTs: event.exchangeTs,
+    reason: "DELTA_SPD",
+  };
+
+  pos.lastIntentId = intentKey;
+  pos.pending += side === "BUY" ? orderSize : -orderSize;
+  positions.set(key, pos);
+  return intent;
+}
+
+function maybeEmitUnwindIntent(event: PmBookEvent): OrderIntent | null {
+  if (currentState !== "RUNNING") return null;
+  if (!event.conditionId || !event.assetId) return null;
+  if (event.bestBid === undefined || event.bestAsk === undefined) return null;
+
+  const key = positionKey(event.conditionId, event.assetId);
+  const pos = positions.get(key) ?? { inventory: 0, pending: 0 };
+  const exposure = pos.inventory + pos.pending;
+  const absExposure = Math.abs(exposure);
+  if (absExposure < inventoryCap * unwindStartFrac) return null;
+
+  const now = event.exchangeTs;
+  if (pos.lastUnwindTs && now - pos.lastUnwindTs < unwindCooldownMs) return null;
+
+  const side: "BUY" | "SELL" = exposure > 0 ? "SELL" : "BUY";
+  let size = Math.min(orderSize, absExposure);
+  if (absExposure >= inventoryCap * unwindAggressiveFrac) {
+    size = Math.min(orderSize * 2, absExposure);
+  }
+
+  // avoid overshoot across zero
+  if (side === "SELL" && exposure - size < 0) size = exposure;
+  if (side === "BUY" && exposure + size > 0) size = -exposure;
+  if (size <= 0) return null;
+
+  const tickSize = defaultTickSize;
+  const edge = unwindMinEdgeTicks * tickSize;
+  let price: number;
+  if (side === "SELL") {
+    price = Math.max(event.bestAsk, event.bestBid + edge);
+    price = roundUpToTick(price, tickSize);
+  } else {
+    price = Math.min(event.bestBid, event.bestAsk - edge);
+    price = roundDownToTick(price, tickSize);
+  }
+
+  const intentKey = [
+    event.conditionId,
+    event.assetId,
+    "UNWIND",
+    side,
+    price.toFixed(6),
+    size.toFixed(6),
+  ].join("|");
+
+  if (pos.pending !== 0 && pos.lastUnwindIntentId === intentKey) return null;
+
+  const intent: OrderIntent = {
+    intentId: intentKey,
+    runId,
+    conditionId: event.conditionId,
+    assetId: event.assetId,
+    side,
+    price,
+    size,
+    createdTs: now,
+    reason: "MM_REBALANCE",
+  };
+
+  pos.lastUnwindIntentId = intentKey;
+  pos.lastUnwindTs = now;
+  pos.pending += side === "BUY" ? size : -size;
+  positions.set(key, pos);
+  return intent;
+}
+
+export function applyFillEvent(ev: FillEvent) {
+  const key = positionKey(ev.conditionId, ev.assetId);
+  const pos = positions.get(key);
+  if (!pos) return;
+  const s = signed(ev.side, ev.filledSize);
+  pos.pending -= s;
+  pos.inventory += s;
+  if (Math.abs(pos.pending) < 1e-9) {
+    pos.pending = 0;
+    pos.lastIntentId = undefined;
+    pos.lastUnwindIntentId = undefined;
+  }
+  positions.set(key, pos);
+  assertPositionInvariant(pos, inventoryCap);
+}
+
+export function applyFailEvent(ev: FailEvent) {
+  const key = positionKey(ev.conditionId, ev.assetId);
+  const pos = positions.get(key);
+  if (!pos) return;
+  const s = signed(ev.side, ev.size);
+  pos.pending -= s;
+  if (Math.abs(pos.pending) < 1e-9) pos.pending = 0;
+  pos.lastIntentId = undefined;
+  pos.lastUnwindIntentId = undefined;
+  positions.set(key, pos);
+  assertPositionInvariant(pos, inventoryCap);
 }
