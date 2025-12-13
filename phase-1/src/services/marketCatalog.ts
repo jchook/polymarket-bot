@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { listGammaMarkets } from "../clients/polymarketData";
 import { db, marketMetadata } from "../db";
 import type { Market } from "polymarket-data";
+import { logger } from "../lib/logger";
 
 const ASSET = "btc";
 const WINDOW_SECONDS = 15 * 60;
@@ -57,6 +58,7 @@ export class MarketCatalog {
   private timer: ReturnType<typeof setInterval> | null = null;
   private state: Map<string, MarketDescriptor> = new Map();
   private listeners: Array<(markets: MarketDescriptor[]) => void> = [];
+  private log = logger("catalog");
 
   constructor(options?: { refreshMs?: number; windowsAhead?: number }) {
     this.refreshMs = options?.refreshMs ?? 60_000;
@@ -116,11 +118,12 @@ export class MarketCatalog {
     }
     this.state = nextState;
     this.notify();
-    console.log(
-      JSON.stringify({
+    this.log(
+      "active %o",
+      {
         runId,
         activeConditions: this.getActiveMarkets().map((m) => m.conditionId),
-      }),
+      },
     );
   }
 

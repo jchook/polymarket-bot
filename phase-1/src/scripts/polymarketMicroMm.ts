@@ -8,6 +8,7 @@ import {
 import { startCoinbaseFeed } from "../services/coinbaseFeed";
 import { MarketCatalog } from "../services/marketCatalog";
 import { startPolymarketPriceFeed } from "../services/polymarketPriceFeed";
+import { logger } from "../lib/logger";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ async function main() {
       'Use "bun run backtest:polymarket:micro-mm" for DB replay; MODE=backtest is not supported in this entrypoint.',
     );
   }
+  const log = logger("orchestrator");
   const baseCtx: PipelineContext = {
     mode,
     featuresVersion: process.env.FEATURES_VERSION,
@@ -81,14 +83,15 @@ async function main() {
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
-  console.log(
-    JSON.stringify({
+  log(
+    "startup %o",
+    {
       runId: RUN_ID,
       mode,
       productIds: PRODUCT_IDS,
       targetAssets: TARGET_ASSETS.length > 0 ? TARGET_ASSETS : "dynamic",
       marketRefreshMs: MARKET_REFRESH_MS,
-    }),
+    },
   );
 }
 

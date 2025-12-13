@@ -10,3 +10,4 @@ Master TODO (checklist of cohesive units of work):
 - [ ] Strategy/execution: Compute Δ_SPD with dynamic thresholds (spread-aware), inventory/risk caps, book-relative limit/IOC pricing, cancel/replace cadence, circuit-breakers; wire to order gateway.
 - [ ] Backtester: Replay joined historical streams, apply latency/slippage/queueing jitter and partial fills, record simulated_trades and PnL/metrics; configurable fee/slippage/latency params.
 - [ ] Observability/time sync: Enforce NTP/monotonic clocks; log exchange_ts vs receive_ts; alerts for heartbeat/data silence; dashboards for missing bid/ask %, dt_ms histogram, spread distribution, gap counters.
+- [ ] MarketCatalog scheduling: add exact 15m boundary handoff (switch activeConditions at window rollovers via timer; keep periodic safety refresh).

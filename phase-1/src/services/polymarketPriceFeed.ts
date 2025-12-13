@@ -8,6 +8,7 @@ import {
   processPmPriceChangesEvent,
 } from "../pipeline/pmPriceChanges";
 import { handleUnifiedEvent } from "../pipeline/unifiedEventConsumer";
+import { logger } from "../lib/logger";
 import { MarketCatalog } from "./marketCatalog";
 
 dotenv.config();
@@ -34,6 +35,7 @@ export function startPolymarketPriceFeed(options: {
   ctx: PipelineContext;
 }): PolymarketFeedHandle {
   const { catalog, staleMs, sink, ctx } = options;
+  const log = logger("pm");
   const targetAssets =
     options.targetAssets && options.targetAssets.length > 0
       ? options.targetAssets
@@ -59,8 +61,7 @@ export function startPolymarketPriceFeed(options: {
         console.error("Failed to persist price_change", err);
       });
     },
-    onStatusChange: (status) =>
-      console.log(new Date().toISOString(), "PM price_changes status:", status),
+    onStatusChange: (status) => log("status %s %s", new Date().toISOString(), status),
   });
 
   const currentFilters = () => {
